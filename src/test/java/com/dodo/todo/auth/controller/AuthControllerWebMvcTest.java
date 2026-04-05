@@ -54,7 +54,7 @@ class AuthControllerWebMvcTest {
     void signupReturnsCreatedMember() throws Exception {
         when(authService.signup(any())).thenReturn(new MemberResponse(1L, "user@example.com", "user"));
 
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -72,7 +72,7 @@ class AuthControllerWebMvcTest {
     @Test
     @DisplayName("회원 가입 요청 값이 잘못되면 검증 오류를 반환한다")
     void signupReturnsValidationErrorForInvalidRequest() throws Exception {
-        mockMvc.perform(post("/api/auth/signup")
+        mockMvc.perform(post("/api/v1/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -96,7 +96,7 @@ class AuthControllerWebMvcTest {
                 new MemberResponse(1L, "login@example.com", "login-user")
         ));
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -124,7 +124,7 @@ class AuthControllerWebMvcTest {
                 604800L
         ));
 
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -140,7 +140,7 @@ class AuthControllerWebMvcTest {
     @Test
     @DisplayName("리프레시 요청 값이 비어 있으면 검증 오류를 반환한다")
     void refreshReturnsValidationErrorForBlankToken() throws Exception {
-        mockMvc.perform(post("/api/auth/refresh")
+        mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -155,7 +155,7 @@ class AuthControllerWebMvcTest {
     @Test
     @DisplayName("로그인 요청 값이 잘못되면 검증 오류를 반환한다")
     void loginReturnsValidationErrorForInvalidRequest() throws Exception {
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -175,7 +175,7 @@ class AuthControllerWebMvcTest {
         when(authService.login(any()))
                 .thenThrow(new ApiException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
-        mockMvc.perform(post("/api/auth/login")
+        mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -200,7 +200,7 @@ class AuthControllerWebMvcTest {
                 )
         );
 
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(5))
                 .andExpect(jsonPath("$.email").value("me@example.com"))
@@ -210,7 +210,7 @@ class AuthControllerWebMvcTest {
     @Test
     @DisplayName("내 정보 조회 시 인증 정보가 없으면 401 응답을 반환한다")
     void meMapsUnauthorizedException() throws Exception {
-        mockMvc.perform(get("/api/auth/me"))
+        mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
     }

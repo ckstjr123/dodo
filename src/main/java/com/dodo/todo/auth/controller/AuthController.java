@@ -19,28 +19,32 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class AuthController implements AuthApiDocs {
 
     private final AuthService authService;
 
+    @Override
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public MemberResponse signup(@Valid @RequestBody SignupRequest request) {
         return authService.signup(request);
     }
 
+    @Override
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
     }
 
+    @Override
     @PostMapping("/refresh")
     public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return authService.refresh(request);
     }
 
+    @Override
     @GetMapping("/me")
     public MemberResponse me(@LoginMember Long memberId) {
         return authService.getCurrentMember(memberId);
