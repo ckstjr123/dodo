@@ -45,7 +45,7 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        jwtTokenProvider = new JwtTokenProvider(jwtProperties(3600L));
+        jwtTokenProvider = new JwtTokenProvider(jwtProperties(604800L));
         authService = new AuthService(memberRepository, passwordEncoder, authenticationManager, jwtTokenProvider);
     }
 
@@ -100,7 +100,7 @@ class AuthServiceTest {
         assertThat(jwtTokenProvider.isValidToken(response.token().accessToken())).isTrue();
         assertThat(jwtTokenProvider.getMemberId(response.token().accessToken())).isEqualTo(1L);
         assertThat(response.token().tokenType()).isEqualTo("Bearer");
-        assertThat(response.token().expiresIn()).isEqualTo(3600L);
+        assertThat(response.token().expiresIn()).isEqualTo(604800L);
         assertThat(response.member().email()).isEqualTo("login@example.com");
     }
 

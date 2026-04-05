@@ -12,20 +12,20 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("유효한 토큰을 생성하고 회원 ID를 다시 읽을 수 있다")
     void generatesAndParsesValidToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(3600L));
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(604800L));
         MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com", "encoded", "user");
 
         String token = jwtTokenProvider.generateAccessToken(principal);
 
         assertThat(jwtTokenProvider.isValidToken(token)).isTrue();
         assertThat(jwtTokenProvider.getMemberId(token)).isEqualTo(7L);
-        assertThat(jwtTokenProvider.getAccessTokenExpirationSeconds()).isEqualTo(3600L);
+        assertThat(jwtTokenProvider.getAccessTokenExpirationSeconds()).isEqualTo(604800L);
     }
 
     @Test
     @DisplayName("형식이 잘못된 토큰은 유효하지 않다")
     void rejectsMalformedToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(3600L));
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(604800L));
 
         assertThat(jwtTokenProvider.isValidToken("not-a-token")).isFalse();
     }

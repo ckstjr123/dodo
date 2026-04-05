@@ -92,7 +92,7 @@ class AuthControllerWebMvcTest {
     @DisplayName("로그인 요청이 성공하면 토큰 응답을 반환한다")
     void loginReturnsTokenResponse() throws Exception {
         when(authService.login(any())).thenReturn(new LoginResponse(
-                new TokenResponse("jwt-token", "Bearer", 3600L),
+                new TokenResponse("jwt-token", "Bearer", 604800L),
                 new MemberResponse(1L, "login@example.com", "login-user")
         ));
 
