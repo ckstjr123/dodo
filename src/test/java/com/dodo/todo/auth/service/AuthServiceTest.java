@@ -149,8 +149,8 @@ class AuthServiceTest {
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Invalid email or password");
+                .isInstanceOf(BadCredentialsException.class)
+                .hasMessage("Bad credentials");
     }
 
     @Test
