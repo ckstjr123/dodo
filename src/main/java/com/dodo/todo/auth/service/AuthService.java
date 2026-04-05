@@ -48,20 +48,17 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public LoginResponse login(LoginRequest request) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.email(), request.password())
-            );
 
-            MemberPrincipal principal = (MemberPrincipal) authentication.getPrincipal();
+        Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+        );
 
-            return new LoginResponse(
-                    createTokenResponse(principal),
-                    new MemberResponse(principal.getId(), principal.getEmail(), principal.getNickname())
-            );
-        } catch (BadCredentialsException exception) {
-            throw new ApiException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Invalid email or password");
-        }
+        MemberPrincipal principal = (MemberPrincipal) authentication.getPrincipal();
+
+        return new LoginResponse(
+                createTokenResponse(principal),
+                new MemberResponse(principal.getId(), principal.getEmail(), principal.getNickname())
+        );
     }
 
     @Transactional(readOnly = true)
@@ -88,6 +85,7 @@ public class AuthService {
     private MemberResponse toMemberResponse(Member member) {
         return new MemberResponse(member.getId(), member.getEmail(), member.getNickname());
     }
+
     private TokenResponse createTokenResponse(MemberPrincipal principal) {
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);

@@ -29,6 +29,7 @@
 - Add concise Korean comments to core business logic.
 
 ## Implementation Guidance
+- Before modifying application code, first explain the planned changes and wait for user approval.
 - When implementing or changing a feature, complete the implementation and tests in the same work.
 - Do not treat implementation as complete until the tests pass.
 - Before finalizing code changes, check for obvious mistakes, regressions, or missing updates.
