@@ -3,7 +3,9 @@ package com.dodo.todo.auth.controller;
 import com.dodo.todo.auth.dto.LoginRequest;
 import com.dodo.todo.auth.dto.LoginResponse;
 import com.dodo.todo.auth.dto.MemberResponse;
+import com.dodo.todo.auth.dto.RefreshTokenRequest;
 import com.dodo.todo.auth.dto.SignupRequest;
+import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.resolver.LoginMember;
 import com.dodo.todo.auth.service.AuthService;
 import jakarta.validation.Valid;
@@ -32,6 +34,11 @@ public class AuthController {
     @PostMapping("/login")
     public LoginResponse login(@Valid @RequestBody LoginRequest request) {
         return authService.login(request);
+    }
+
+    @PostMapping("/refresh")
+    public TokenResponse refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        return authService.refresh(request);
     }
 
     @GetMapping("/me")

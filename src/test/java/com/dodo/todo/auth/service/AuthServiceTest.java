@@ -9,6 +9,7 @@ import com.dodo.todo.auth.config.JwtProperties;
 import com.dodo.todo.auth.dto.LoginRequest;
 import com.dodo.todo.auth.dto.LoginResponse;
 import com.dodo.todo.auth.dto.MemberResponse;
+import com.dodo.todo.auth.dto.RefreshTokenRequest;
 import com.dodo.todo.auth.dto.SignupRequest;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
@@ -38,6 +39,9 @@ class AuthServiceTest {
     @Mock
     private AuthenticationManager authenticationManager;
 
+    @Mock
+    private CustomUserDetailsService customUserDetailsService;
+
     private AuthService authService;
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
@@ -45,12 +49,18 @@ class AuthServiceTest {
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder();
-        jwtTokenProvider = new JwtTokenProvider(jwtProperties(604800L));
-        authService = new AuthService(memberRepository, passwordEncoder, authenticationManager, jwtTokenProvider);
+        jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
+        authService = new AuthService(
+                memberRepository,
+                passwordEncoder,
+                authenticationManager,
+                jwtTokenProvider,
+                customUserDetailsService
+        );
     }
 
     @Test
-    @DisplayName("회원가입 시 비밀번호를 암호화해 저장한다")
+    @DisplayName("회원 가입 시 비밀번호를 암호화해 저장한다")
     void signupCreatesMemberWithEncodedPassword() {
         SignupRequest request = new SignupRequest("user@example.com", "password123", "user");
         AtomicReference<Member> savedMemberRef = new AtomicReference<>();
@@ -74,7 +84,7 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("회원가입 시 중복 이메일이면 예외가 발생한다")
+    @DisplayName("회원 가입 시 중복 이메일이면 예외가 발생한다")
     void signupRejectsDuplicateEmail() {
         SignupRequest request = new SignupRequest("dup@example.com", "password123", "dup");
         when(memberRepository.existsByEmail(request.email())).thenReturn(true);
@@ -85,7 +95,7 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("로그인 시 유효한 JWT와 회원 정보를 반환한다")
+    @DisplayName("로그인 성공 시 access 토큰과 refresh 토큰을 함께 반환한다")
     void loginReturnsTokenAndMember() {
         LoginRequest request = new LoginRequest("login@example.com", "password123");
         MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com", "encoded", "login-user");
@@ -97,11 +107,38 @@ class AuthServiceTest {
 
         LoginResponse response = authService.login(request);
 
-        assertThat(jwtTokenProvider.isValidToken(response.token().accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidAccessToken(response.token().accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidRefreshToken(response.token().refreshToken())).isTrue();
         assertThat(jwtTokenProvider.getMemberId(response.token().accessToken())).isEqualTo(1L);
         assertThat(response.token().tokenType()).isEqualTo("Bearer");
-        assertThat(response.token().expiresIn()).isEqualTo(604800L);
+        assertThat(response.token().expiresIn()).isEqualTo(1800L);
+        assertThat(response.token().refreshTokenExpiresIn()).isEqualTo(604800L);
         assertThat(response.member().email()).isEqualTo("login@example.com");
+    }
+
+    @Test
+    @DisplayName("리프레시 토큰으로 새 토큰 쌍을 재발급한다")
+    void refreshReturnsNewTokenPair() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com", "encoded", "login-user");
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+
+        when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
+
+        var response = authService.refresh(new RefreshTokenRequest(refreshToken));
+
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
+        assertThat(jwtTokenProvider.getMemberId(response.refreshToken())).isEqualTo(1L);
+        assertThat(response.expiresIn()).isEqualTo(1800L);
+        assertThat(response.refreshTokenExpiresIn()).isEqualTo(604800L);
+    }
+
+    @Test
+    @DisplayName("유효하지 않은 리프레시 토큰이면 예외가 발생한다")
+    void refreshRejectsInvalidRefreshToken() {
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest("bad-refresh-token")))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Refresh token is invalid");
     }
 
     @Test
@@ -126,10 +163,11 @@ class AuthServiceTest {
                 .hasMessage("Member not found");
     }
 
-    private JwtProperties jwtProperties(long expirationSeconds) {
+    private JwtProperties jwtProperties(long accessExpirationSeconds, long refreshExpirationSeconds) {
         JwtProperties jwtProperties = new JwtProperties();
         jwtProperties.setSecret("test-secret-key-test-secret-key-1234");
-        jwtProperties.setAccessTokenExpirationSeconds(expirationSeconds);
+        jwtProperties.setAccessTokenExpirationSeconds(accessExpirationSeconds);
+        jwtProperties.setRefreshTokenExpirationSeconds(refreshExpirationSeconds);
         return jwtProperties;
     }
 }

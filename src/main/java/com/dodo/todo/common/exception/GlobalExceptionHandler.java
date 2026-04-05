@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
         Map<String, String> validationErrors = new LinkedHashMap<>();
 
         for (FieldError fieldError : exception.getBindingResult().getFieldErrors()) {
-            validationErrors.put(fieldError.getField(), fieldError.getDefaultMessage());
+            validationErrors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)

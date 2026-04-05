@@ -50,7 +50,7 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("회원가입 요청이 성공하면 생성된 회원 정보를 반환한다")
+    @DisplayName("회원 가입 요청이 성공하면 생성된 회원 정보를 반환한다")
     void signupReturnsCreatedMember() throws Exception {
         when(authService.signup(any())).thenReturn(new MemberResponse(1L, "user@example.com", "user"));
 
@@ -70,7 +70,7 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("회원가입 요청 값이 잘못되면 검증 오류를 반환한다")
+    @DisplayName("회원 가입 요청 값이 잘못되면 검증 오류를 반환한다")
     void signupReturnsValidationErrorForInvalidRequest() throws Exception {
         mockMvc.perform(post("/api/auth/signup")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -89,10 +89,10 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("로그인 요청이 성공하면 토큰 응답을 반환한다")
+    @DisplayName("로그인 요청이 성공하면 access 토큰과 refresh 토큰을 반환한다")
     void loginReturnsTokenResponse() throws Exception {
         when(authService.login(any())).thenReturn(new LoginResponse(
-                new TokenResponse("jwt-token", "Bearer", 604800L),
+                new TokenResponse("access-token", "refresh-token", "Bearer", 1800L, 604800L),
                 new MemberResponse(1L, "login@example.com", "login-user")
         ));
 
@@ -105,9 +105,51 @@ class AuthControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token.accessToken").value("jwt-token"))
+                .andExpect(jsonPath("$.token.accessToken").value("access-token"))
+                .andExpect(jsonPath("$.token.refreshToken").value("refresh-token"))
                 .andExpect(jsonPath("$.token.tokenType").value("Bearer"))
+                .andExpect(jsonPath("$.token.expiresIn").value(1800))
+                .andExpect(jsonPath("$.token.refreshTokenExpiresIn").value(604800))
                 .andExpect(jsonPath("$.member.email").value("login@example.com"));
+    }
+
+    @Test
+    @DisplayName("리프레시 요청이 성공하면 새 토큰 쌍을 반환한다")
+    void refreshReturnsTokenResponse() throws Exception {
+        when(authService.refresh(any())).thenReturn(new TokenResponse(
+                "new-access-token",
+                "new-refresh-token",
+                "Bearer",
+                1800L,
+                604800L
+        ));
+
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": "refresh-token"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
+                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
+                .andExpect(jsonPath("$.refreshTokenExpiresIn").value(604800));
+    }
+
+    @Test
+    @DisplayName("리프레시 요청 값이 비어 있으면 검증 오류를 반환한다")
+    void refreshReturnsValidationErrorForBlankToken() throws Exception {
+        mockMvc.perform(post("/api/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "refreshToken": ""
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.validationErrors.refreshToken").exists());
     }
 
     @Test
@@ -166,7 +208,7 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("내 정보 조회 시 인증이 없으면 401 응답을 반환한다")
+    @DisplayName("내 정보 조회 시 인증 정보가 없으면 401 응답을 반환한다")
     void meMapsUnauthorizedException() throws Exception {
         mockMvc.perform(get("/api/auth/me"))
                 .andExpect(status().isUnauthorized())

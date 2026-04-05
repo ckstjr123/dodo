@@ -1,6 +1,7 @@
 package com.dodo.todo.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -39,14 +40,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("유효한 토큰이면 SecurityContext에 인증 정보를 저장한다")
+    @DisplayName("유효한 access 토큰이면 SecurityContext에 인증 정보를 저장한다")
     void setsAuthenticationForValidToken() throws Exception {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
         MockHttpServletRequest request = requestWithBearerToken("valid-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MemberPrincipal principal = new MemberPrincipal(3L, "user@example.com", "encoded", "user");
 
-        when(jwtTokenProvider.isValidToken("valid-token")).thenReturn(true);
+        when(jwtTokenProvider.isValidAccessToken("valid-token")).thenReturn(true);
         when(jwtTokenProvider.getMemberId("valid-token")).thenReturn(3L);
         when(customUserDetailsService.loadUserById(3L)).thenReturn(principal);
 
@@ -64,12 +65,12 @@ class JwtAuthenticationFilterTest {
         MockHttpServletRequest request = requestWithBearerToken("bad-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenProvider.isValidToken("bad-token")).thenReturn(false);
+        when(jwtTokenProvider.isValidAccessToken("bad-token")).thenReturn(false);
 
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(customUserDetailsService, never()).loadUserById(org.mockito.ArgumentMatchers.anyLong());
+        verify(customUserDetailsService, never()).loadUserById(anyLong());
         verify(filterChain).doFilter(request, response);
     }
 
@@ -80,7 +81,7 @@ class JwtAuthenticationFilterTest {
         MockHttpServletRequest request = requestWithBearerToken("stale-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenProvider.isValidToken("stale-token")).thenReturn(true);
+        when(jwtTokenProvider.isValidAccessToken("stale-token")).thenReturn(true);
         when(jwtTokenProvider.getMemberId("stale-token")).thenReturn(99L);
         when(customUserDetailsService.loadUserById(99L))
                 .thenThrow(new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));

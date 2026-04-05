@@ -8,4 +8,5 @@ spring.jpa.open-in-view=false
 spring.sql.init.mode=never
 
 jwt.secret=replace-with-runtime-secret-key-before-deploy
-jwt.access-token-expiration-seconds=604800
+jwt.access-token-expiration-seconds=1800
+jwt.refresh-token-expiration-seconds=604800

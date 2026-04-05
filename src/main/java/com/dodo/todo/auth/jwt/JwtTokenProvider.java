@@ -15,6 +15,10 @@ import org.springframework.stereotype.Component;
 @Component
 public class JwtTokenProvider {
 
+    private static final String TOKEN_TYPE_CLAIM = "token_type";
+    private static final String ACCESS_TOKEN_TYPE = "ACCESS";
+    private static final String REFRESH_TOKEN_TYPE = "REFRESH";
+
     private final JwtProperties jwtProperties;
     private final SecretKey secretKey;
 
@@ -24,42 +28,70 @@ public class JwtTokenProvider {
     }
 
     public String generateAccessToken(MemberPrincipal memberPrincipal) {
-        Instant now = Instant.now();
-        Instant expiresAt = now.plusSeconds(jwtProperties.getAccessTokenExpirationSeconds());
+        return generateToken(memberPrincipal, jwtProperties.getAccessTokenExpirationSeconds(), ACCESS_TOKEN_TYPE);
+    }
 
-        return Jwts.builder()
-                .subject(memberPrincipal.getId().toString())
-                .claim("email", memberPrincipal.getEmail())
-                .claim("nickname", memberPrincipal.getNickname())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expiresAt))
-                .signWith(secretKey)
-                .compact();
+    public String generateRefreshToken(MemberPrincipal memberPrincipal) {
+        return generateToken(memberPrincipal, jwtProperties.getRefreshTokenExpirationSeconds(), REFRESH_TOKEN_TYPE);
     }
 
     public Long getMemberId(String token) {
-        Claims claims = Jwts.parser()
-                .verifyWith(secretKey)
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
-
-        return Long.valueOf(claims.getSubject());
+        return Long.valueOf(parseClaims(token).getSubject());
     }
 
     public boolean isValidToken(String token) {
         try {
-            Jwts.parser()
-                    .verifyWith(secretKey)
-                    .build()
-                    .parseSignedClaims(token);
+            parseClaims(token);
             return true;
         } catch (JwtException | IllegalArgumentException exception) {
             return false;
         }
     }
 
+    public boolean isValidAccessToken(String token) {
+        return isValidTokenOfType(token, ACCESS_TOKEN_TYPE);
+    }
+
+    public boolean isValidRefreshToken(String token) {
+        return isValidTokenOfType(token, REFRESH_TOKEN_TYPE);
+    }
+
     public long getAccessTokenExpirationSeconds() {
         return jwtProperties.getAccessTokenExpirationSeconds();
+    }
+
+    public long getRefreshTokenExpirationSeconds() {
+        return jwtProperties.getRefreshTokenExpirationSeconds();
+    }
+
+    private String generateToken(MemberPrincipal memberPrincipal, long expirationSeconds, String tokenType) {
+        Instant now = Instant.now();
+        Instant expiresAt = now.plusSeconds(expirationSeconds);
+
+        return Jwts.builder()
+                .subject(memberPrincipal.getId().toString())
+                .claim("nickname", memberPrincipal.getNickname())
+                .claim(TOKEN_TYPE_CLAIM, tokenType)
+                .issuedAt(Date.from(now))
+                .expiration(Date.from(expiresAt))
+                .signWith(secretKey)
+                .compact();
+    }
+
+    private boolean isValidTokenOfType(String token, String tokenType) {
+        try {
+            Claims claims = parseClaims(token);
+            return tokenType.equals(claims.get(TOKEN_TYPE_CLAIM, String.class));
+        } catch (JwtException | IllegalArgumentException exception) {
+            return false;
+        }
+    }
+
+    private Claims parseClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(secretKey)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
     }
 }

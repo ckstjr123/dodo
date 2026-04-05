@@ -3,6 +3,7 @@ package com.dodo.todo.auth.service;
 import com.dodo.todo.auth.dto.LoginRequest;
 import com.dodo.todo.auth.dto.LoginResponse;
 import com.dodo.todo.auth.dto.MemberResponse;
+import com.dodo.todo.auth.dto.RefreshTokenRequest;
 import com.dodo.todo.auth.dto.SignupRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
@@ -28,6 +29,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+    private final CustomUserDetailsService customUserDetailsService;
 
     @Transactional
     public MemberResponse signup(SignupRequest request) {
@@ -52,15 +54,27 @@ public class AuthService {
             );
 
             MemberPrincipal principal = (MemberPrincipal) authentication.getPrincipal();
-            String accessToken = jwtTokenProvider.generateAccessToken(principal);
 
             return new LoginResponse(
-                    new TokenResponse(accessToken, "Bearer", jwtTokenProvider.getAccessTokenExpirationSeconds()),
+                    createTokenResponse(principal),
                     new MemberResponse(principal.getId(), principal.getEmail(), principal.getNickname())
             );
         } catch (BadCredentialsException exception) {
             throw new ApiException("INVALID_CREDENTIALS", HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public TokenResponse refresh(RefreshTokenRequest request) {
+        if (!jwtTokenProvider.isValidRefreshToken(request.refreshToken())) {
+            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+        }
+
+        Long memberId = jwtTokenProvider.getMemberId(request.refreshToken());
+        MemberPrincipal principal = customUserDetailsService.loadUserById(memberId);
+
+        // 리프레시 토큰 재발급 시 access/refresh 토큰 쌍을 함께 갱신한다.
+        return createTokenResponse(principal);
     }
 
     @Transactional(readOnly = true)
@@ -73,5 +87,17 @@ public class AuthService {
 
     private MemberResponse toMemberResponse(Member member) {
         return new MemberResponse(member.getId(), member.getEmail(), member.getNickname());
+    }
+    private TokenResponse createTokenResponse(MemberPrincipal principal) {
+        String accessToken = jwtTokenProvider.generateAccessToken(principal);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+
+        return new TokenResponse(
+                accessToken,
+                refreshToken,
+                "Bearer",
+                jwtTokenProvider.getAccessTokenExpirationSeconds(),
+                jwtTokenProvider.getRefreshTokenExpirationSeconds()
+        );
     }
 }
