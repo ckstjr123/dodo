@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: "ko-KR"
+early_access: false
+
+reviews:
+  profile: "chill"
+  high_level_summary: true
+  review_status: true
+  poem: false
+  path_filters:
+    - "src/**"
+    - "docs/**"
+    - "gradle/**"
+    - "gradlew"
+    - "gradlew.bat"
+    - "settings.gradle"
+    - "!out/**"
+    - "!build/**"
+    - "!dist/**"
+    - "!node_modules/**"
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+
+chat:
+  auto_reply: true
