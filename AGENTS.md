@@ -36,10 +36,10 @@
 ## Testing
 - Add unit tests for the service layer and domain logic.
 - For controller behavior, request validation, and response mapping, add web tests such as `@WebMvcTest`.
+- Tests must include the essential happy paths and only the important edge cases and failure cases.
 - Use mocking only for external APIs, infrastructure boundaries, or cases where isolation is otherwise difficult or unnecessary complexity would be introduced.
 - Avoid using reflection in tests unless there is no reasonable alternative.
 - Add `@DisplayName` to every test method and write the display names in Korean.
-- Tests must still cover only the essential important edge cases and failure cases.
 - If tests fail, review the cause first and proceed with refactoring only when it is necessary and justified.
 
 ## Commit Convention
