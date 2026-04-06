@@ -34,14 +34,12 @@ public class AuthService {
     private final CustomUserDetailsService customUserDetailsService;
     private final List<OAuthClient> oAuthClients;
 
-    @Transactional
     public TokenResponse login(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
         OAuthUserInfo userInfo = authenticate(provider, request.authorizationCode(), request.redirectUri());
         validateOAuthUserInfo(userInfo);
 
-        Member member = findOrCreateMember(userInfo.email());
-        return issueTokenResponse(new MemberPrincipal(member.getId(), member.getEmail()));
+        return completeLogin(userInfo);
     }
 
     @Transactional
@@ -64,21 +62,12 @@ public class AuthService {
 
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        LocalDateTime expiredAt = now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds());
-
-        // 기존 토큰값을 조건으로 갱신해 동시에 같은 세션을 회전하는 요청을 한 쪽만 통과시킨다.
-        int updatedCount = refreshTokenRepository.rotateToken(
-                storedRefreshToken.getId(),
-                request.refreshToken(),
+        storedRefreshToken.rotate(
                 refreshToken,
-                expiredAt,
-                now
+                now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
         );
-        if (updatedCount == 0) {
-            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
-        }
-
         cleanUpRefreshTokens(memberId);
+
         return new TokenResponse(accessToken, refreshToken, "Bearer");
     }
 
@@ -97,6 +86,12 @@ public class AuthService {
         createRefreshToken(principal.getId(), refreshToken);
 
         return new TokenResponse(accessToken, refreshToken, "Bearer");
+    }
+
+    @Transactional
+    protected TokenResponse completeLogin(OAuthUserInfo userInfo) {
+        Member member = findOrCreateMember(userInfo.email());
+        return issueTokenResponse(new MemberPrincipal(member.getId(), member.getEmail()));
     }
 
     private OAuthUserInfo authenticate(SocialProvider provider, String authorizationCode, String redirectUri) {
@@ -167,7 +162,12 @@ public class AuthService {
     }
 
     private void cleanUpRefreshTokens(Long memberId) {
-        // 최신 세션 2개를 제외한 나머지는 DB에서 한 번에 삭제해 정리 경쟁 구간을 줄인다.
-        refreshTokenRepository.deleteOldTokensKeepingLatest(memberId, MAX_REFRESH_TOKEN_SESSIONS);
+        // 최근 사용 기준으로 최신 2세션만 남긴다.
+        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(memberId);
+        if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
+            return;
+        }
+
+        refreshTokenRepository.deleteAll(refreshTokens.subList(MAX_REFRESH_TOKEN_SESSIONS, refreshTokens.size()));
     }
 }

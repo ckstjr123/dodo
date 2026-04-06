@@ -3,8 +3,6 @@ package com.dodo.todo.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -90,13 +88,14 @@ class AuthServiceTest {
         when(memberRepository.findByEmail("google@example.com")).thenReturn(Optional.of(member));
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
 
         TokenResponse response = authService.login(request);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
         verify(memberRepository, never()).save(any(Member.class));
-        verify(refreshTokenRepository).deleteOldTokensKeepingLatest(1L, 2);
     }
 
     @Test
@@ -123,13 +122,14 @@ class AuthServiceTest {
         when(memberRepository.save(any(Member.class))).thenReturn(savedMember);
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
 
         authService.login(request);
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberRepository).save(captor.capture());
         assertThat(captor.getValue().getEmail()).isEqualTo("new-google@example.com");
-        verify(refreshTokenRepository).deleteOldTokensKeepingLatest(1L, 2);
     }
 
     @Test
@@ -159,11 +159,12 @@ class AuthServiceTest {
                 .thenThrow(new DataIntegrityViolationException("duplicate email"));
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
 
         TokenResponse response = authService.login(request);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
-        verify(refreshTokenRepository).deleteOldTokensKeepingLatest(1L, 2);
     }
 
     @Test
@@ -208,34 +209,24 @@ class AuthServiceTest {
     void refreshReturnsNewTokenPair() {
         MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        RefreshToken storedRefreshToken = mock(RefreshToken.class);
+        RefreshToken storedRefreshToken = RefreshToken.builder()
+                .memberId(1L)
+                .token(refreshToken)
+                .expiredAt(LocalDateTime.now().plusDays(1))
+                .build();
 
-        when(storedRefreshToken.getId()).thenReturn(10L);
-        when(storedRefreshToken.getToken()).thenReturn(refreshToken);
-        when(storedRefreshToken.isExpired(any(LocalDateTime.class))).thenReturn(false);
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
         when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
-        when(refreshTokenRepository.rotateToken(
-                eq(10L),
-                eq(refreshToken),
-                anyString(),
-                any(LocalDateTime.class),
-                any(LocalDateTime.class)
-        )).thenReturn(1);
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of(mock(RefreshToken.class), mock(RefreshToken.class)));
 
         TokenResponse response = authService.refresh(new RefreshTokenRequest(refreshToken));
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
         assertThat(response.tokenType()).isEqualTo("Bearer");
-        verify(refreshTokenRepository).rotateToken(
-                eq(10L),
-                eq(refreshToken),
-                eq(response.refreshToken()),
-                any(LocalDateTime.class),
-                any(LocalDateTime.class)
-        );
-        verify(refreshTokenRepository).deleteOldTokensKeepingLatest(1L, 2);
+        assertThat(storedRefreshToken.getToken()).isEqualTo(response.refreshToken());
+        assertThat(storedRefreshToken.getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
         verify(refreshTokenRepository, never()).delete(storedRefreshToken);
     }
 
@@ -272,43 +263,23 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("동시에 다른 요청이 먼저 회전한 리프레시 토큰이면 재발급에 실패한다")
-    void refreshRejectsRefreshTokenWhenConcurrentRotationAlreadyUpdatedIt() {
-        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
-        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        RefreshToken storedRefreshToken = mock(RefreshToken.class);
-
-        when(storedRefreshToken.getId()).thenReturn(10L);
-        when(storedRefreshToken.getToken()).thenReturn(refreshToken);
-        when(storedRefreshToken.isExpired(any(LocalDateTime.class))).thenReturn(false);
-        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
-        when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
-        when(refreshTokenRepository.rotateToken(
-                eq(10L),
-                eq(refreshToken),
-                anyString(),
-                any(LocalDateTime.class),
-                any(LocalDateTime.class)
-        )).thenReturn(0);
-
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Refresh token is invalid");
-    }
-
-    @Test
-    @DisplayName("세션 발급 후 최신 2세션만 유지하도록 정리 쿼리를 호출한다")
+    @DisplayName("새 세션 발급 시 최근 사용 2세션만 유지한다")
     void issueTokenResponseKeepsOnlyTwoLatestRefreshTokens() {
         MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        RefreshToken first = mock(RefreshToken.class);
+        RefreshToken second = mock(RefreshToken.class);
+        RefreshToken third = mock(RefreshToken.class);
 
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of(first, second, third));
 
         TokenResponse response = authService.issueTokenResponse(principal);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
-        verify(refreshTokenRepository).deleteOldTokensKeepingLatest(1L, 2);
+        verify(refreshTokenRepository).deleteAll(List.of(third));
     }
 
     @Test
@@ -317,6 +288,8 @@ class AuthServiceTest {
         MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
         when(refreshTokenRepository.save(any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
 
         authService.issueTokenResponse(principal);
 
