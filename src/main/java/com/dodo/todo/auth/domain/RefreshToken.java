@@ -1,4 +1,4 @@
-package com.dodo.todo.member.domain;
+package com.dodo.todo.auth.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,16 +16,22 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(name = "member")
+@Table(name = "refresh_token")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class Member {
+public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true, length = 255)
-    private String email;
+    @Column(name = "member_id", nullable = false)
+    private Long memberId;
+
+    @Column(nullable = false, length = 512)
+    private String token;
+
+    @Column(name = "expired_at", nullable = false)
+    private LocalDateTime expiredAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -34,8 +40,20 @@ public class Member {
     private LocalDateTime updatedAt;
 
     @Builder
-    private Member(String email) {
-        this.email = email;
+    private RefreshToken(Long memberId, String token, LocalDateTime expiredAt) {
+        this.memberId = memberId;
+        this.token = token;
+        this.expiredAt = expiredAt;
+    }
+
+    public boolean isExpired(LocalDateTime now) {
+        return expiredAt.isBefore(now) || expiredAt.isEqual(now);
+    }
+
+    // 같은 세션 row를 유지하면서 토큰과 만료 시각만 교체한다.
+    public void rotate(String token, LocalDateTime expiredAt) {
+        this.token = token;
+        this.expiredAt = expiredAt;
     }
 
     @PrePersist

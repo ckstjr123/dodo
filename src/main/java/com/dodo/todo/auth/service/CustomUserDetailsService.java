@@ -6,23 +6,13 @@ import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.domain.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
-public class CustomUserDetailsService implements UserDetailsService {
+public class CustomUserDetailsService {
 
     private final MemberRepository memberRepository;
-
-    @Override
-    public MemberPrincipal loadUserByUsername(String username) throws UsernameNotFoundException {
-        Member member = memberRepository.findByEmail(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Member not found"));
-
-        return toPrincipal(member);
-    }
 
     public MemberPrincipal loadUserById(Long memberId) {
         Member member = memberRepository.findById(memberId)
@@ -34,9 +24,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     private MemberPrincipal toPrincipal(Member member) {
         return new MemberPrincipal(
                 member.getId(),
-                member.getEmail(),
-                member.getPassword(),
-                member.getNickname()
+                member.getEmail()
         );
     }
 }

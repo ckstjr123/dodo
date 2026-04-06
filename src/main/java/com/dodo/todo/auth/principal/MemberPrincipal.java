@@ -11,14 +11,10 @@ public class MemberPrincipal implements UserDetails {
 
     private final Long id;
     private final String email;
-    private final String password;
-    private final String nickname;
 
-    public MemberPrincipal(Long id, String email, String password, String nickname) {
+    public MemberPrincipal(Long id, String email) {
         this.id = id;
         this.email = email;
-        this.password = password;
-        this.nickname = nickname;
     }
 
     @Override
@@ -29,5 +25,10 @@ public class MemberPrincipal implements UserDetails {
     @Override
     public String getUsername() {
         return email;
+    }
+
+    @Override
+    public String getPassword() {
+        return null;
     }
 }
