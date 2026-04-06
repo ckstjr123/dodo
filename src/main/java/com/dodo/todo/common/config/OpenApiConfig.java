@@ -12,7 +12,7 @@ import org.springframework.context.annotation.Configuration;
         info = @Info(
                 title = "Dodo Todo API",
                 version = "v1",
-                description = "Todo 서비스 API 문서"
+                description = "Todo Application API Docs"
         )
 )
 @SecurityScheme(

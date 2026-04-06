@@ -1,94 +1,83 @@
 # Features
 
 ## Authentication
-- 인증은 단순한 JWT 액세스 토큰 흐름으로 구현한다.
-- 회원은 `email`, `password`, `nickname`으로 가입한다.
-- 회원은 `email`과 `password`로 로그인한다.
-- `email`은 회원 전체에서 유일해야 한다.
-- 로그인 응답으로 JWT 액세스 토큰을 반환한다.
-- 인증이 필요한 요청은 `Authorization: Bearer {token}` 헤더로 토큰을 전달한다.
-- 인증된 클라이언트를 위해 현재 로그인한 회원 조회 엔드포인트를 제공한다.
+- 인증은 JWT access token과 refresh token 조합으로 처리한다.
+- 로컬 회원가입과 로컬 로그인은 제거된 상태다.
+- 회원은 현재 `email`만 보유하고, 소셜 로그인 계정 식별의 기준으로 사용한다.
+- 인증이 필요한 요청은 `Authorization: Bearer {accessToken}` 헤더로 access token을 전달한다.
+- 현재 제공하는 인증 API는 `POST /api/v1/auth/social/login`, `POST /api/v1/auth/refresh`, `GET /api/v1/auth/me`다.
+- `GET /api/v1/auth/me`는 현재 로그인한 회원의 `id`, `email`을 반환한다.
+
+### Google Social Login
+- 프론트엔드는 Google 로그인 후 받은 `authorizationCode`를 `POST /api/v1/auth/social/login`으로 전달한다.
+- 요청 본문에는 `provider`, `authorizationCode`, `redirectUri`를 포함한다.
+- 백엔드는 Google token endpoint에서 authorization code를 검증하고, userinfo endpoint에서 사용자 정보를 조회한다.
+- Google 인증이 성공하면 Google 토큰을 그대로 반환하지 않고, 우리 서버가 새 access token과 refresh token을 발급해 JSON으로 응답한다.
+- Google에서 전달받은 이메일이 없거나, 이메일 인증이 되어 있지 않으면 로그인에 실패한다.
+- 현재는 별도 소셜 식별 테이블 없이 이메일 기준으로 기존 회원을 재사용한다.
+- 처음 로그인한 이메일이면 회원을 자동 생성한다.
+
+### Refresh Token
+- refresh token은 `refresh_token` 테이블에 저장하고 서버가 유효성을 직접 검증한다.
+- refresh token에는 `jti`를 포함해 같은 회원에게 연속 발급해도 서로 다른 JWT가 만들어지도록 한다.
+- refresh token 재발급 시 기존 세션 row를 유지한 채 token, `expired_at`, `updated_at`만 갱신한다.
+- 회원당 최대 2개의 refresh token 세션만 유지한다.
+- 세션 수가 2개를 초과하면 `updated_at` 기준으로 가장 오래 사용되지 않은 refresh token부터 삭제한다.
+- `refresh_token.token`에는 인덱스만 두고, unique 제약은 두지 않는다.
 
 ## Todo
-- `todo`는 기본 작업 단위이다.
-- Todo는 날짜 기준 분리가 없어도 독립적으로 존재할 수 있다.
-- 장기간 진행되는 작업은 하나의 Todo와 여러 체크리스트 항목으로 관리한다.
+- `todo`는 기본 작업 단위다.
+- Todo는 제목과 상태, 우선순위, 정렬 순서를 가진다.
+- Todo는 간단한 설명을 위한 `memo`를 가진다.
+- Todo는 시간까지 포함하는 마감 시각 `due_at`을 가질 수 있다.
+
+## Repeat
+- 반복 설정은 Todo 본체와 분리된 `todo_repeat`로 관리한다.
+- 반복이 없는 Todo는 `todo_repeat` 레코드가 없다.
+- 하나의 Todo는 최대 하나의 반복 규칙만 가진다.
+- 공통 필드는 `repeat_type`, `repeat_interval`이다.
+- 현재 지원하는 반복 타입은 `DAILY`, `WEEKLY`다.
+- `DAILY`는 `repeat_interval`만 사용한다.
+- `WEEKLY`는 `repeat_interval`과 `days_of_week_json`을 함께 사용한다.
+- `days_of_week_json`은 DB에는 JSON 배열로 저장하고, 애플리케이션에서는 `Set<DayOfWeek>`로 다룬다.
+- `DAILY`는 `days_of_week_json`이 비어 있어야 한다.
+- `WEEKLY`는 최소 하나 이상의 요일이 필요하다.
+- `repeat_interval`은 1 이상이어야 한다.
+
+## Reminder
+- 알림 설정은 Todo 본체와 분리된 `reminder`로 관리한다.
+- 하나의 Todo는 여러 개의 알림을 가질 수 있다.
+- 알림 타입은 `RELATIVE_TO_DUE`, `ABSOLUTE_AT` 두 가지다.
+- `RELATIVE_TO_DUE`는 `todo.due_at` 기준의 상대 알림이다.
+- `RELATIVE_TO_DUE`는 분 단위 정수 필드 `remind_before`를 사용한다.
+- `ABSOLUTE_AT`는 특정 시각을 직접 지정하는 알림이며 `remind_at`을 사용한다.
+- `RELATIVE_TO_DUE`는 `remind_before >= 1`이어야 한다.
+- `ABSOLUTE_AT`는 `remind_at`이 필요하다.
+- 알림이 필요할 때만 `reminder`를 생성하고, 해제는 삭제로 처리한다.
+- 반복 Todo에 대한 자동 알림 생성과 발송은 현재 범위에 포함하지 않는다.
 
 ## Checklist
-- `checklist`는 `todo`의 하위 요소이다.
+- `checklist`는 `todo`의 하위 요소다.
 - 체크리스트 항목은 완료 처리할 수 있다.
 - 체크리스트 항목은 삭제할 수 있다.
-- 완료된 체크리스트 항목이 많아지면 UI에서 기본적으로 접힌 상태로 보여야 한다.
 
-## Classification
-
-### Category
-- `category`는 Todo의 대표 분류이며, 공부, 운동, 업무처럼 큰 작업 맥락을 표현한다.
-- Todo는 정확히 하나의 `category`에 속해야 하며, `todo.category_id`는 필수값이다.
+## Category
+- `category`는 Todo의 큰 분류다.
+- Todo는 정확히 하나의 `category`를 가진다.
 - 카테고리는 회원 소유 데이터이며 다른 회원과 공유하지 않는다.
-- Todo에 카테고리를 연결하거나 변경할 때 서비스는 Todo와 Category가 같은 회원에게 속하는지 검증해야 한다.
 
-### Tag
-- `tag`는 카테고리보다 더 세밀한 관리를 위한 보조 분류이며, 검색, 필터링, 상태 구분, 주제 표시 같은 다중 라벨링에 사용한다.
+## Tag
+- `tag`는 세부 분류와 검색 보조를 위한 데이터다.
 - 태그는 회원 소유 데이터이며 다른 회원과 공유하지 않는다.
-- 태그 이름은 중복을 허용한다.
-- 하나의 Todo에는 여러 `tag`를 연결할 수 있고, 하나의 `tag`도 여러 Todo에 연결될 수 있다.
-- `todo_tag`는 Todo와 Tag의 다대다 연결을 표현하는 매핑 도메인이다.
-- `todo_tag`에는 유니크 제약이 없으므로 중복 연결은 서비스 로직에서 막아야 한다.
-- Todo에 태그를 연결하기 전에 서비스는 Todo와 Tag가 같은 회원에게 속하는지 검증해야 한다.
-- 태그 연결 기능을 구현할 경우 다음을 확인해야 한다.
-  - todo가 현재 회원에게 속하는지
-  - tag가 현재 회원에게 속하는지
-  - 중복 연결이 애플리케이션 로직에서 차단되는지
-
+- 하나의 Todo는 여러 태그를 가질 수 있다.
+- `todo_tag`는 Todo와 Tag의 연결을 나타내는 매핑 테이블이다.
 
 ## Planned Features
 
+### Social Login
+- 다음 단계에서 Kakao 등 다른 provider를 추가할 수 있도록 `provider` 기반 요청 구조를 유지한다.
+
 ### Notifications
-- 알림은 중요한 기능이지만, 첫 번째 필수 구현 대상은 아니다.
-- 먼저 핵심 Todo 기능을 구현하고, 주요 Todo 흐름이 안정화된 뒤 알림을 추가한다.
-- 초기 알림 방향은 웹 푸시이다.
-- 이후 모바일 푸시를 처음부터 다시 설계하지 않고 추가할 수 있도록 모델은 확장 가능해야 한다.
-
-### Notification Goals
-- 회원은 Todo 작업과 관련된 리마인더형 알림을 받을 수 있어야 한다.
-- 알림은 관련 Todo 화면으로 다시 이동할 수 있어야 한다.
-- 알림 동작은 현재의 웹 푸시와 향후의 앱 푸시를 모두 지원할 수 있어야 한다.
-- 알림 전송 실패가 핵심 Todo 비즈니스 흐름을 깨뜨리면 안 된다.
-
-### Notification Scope
-- 1단계:
-  - 인증된 회원의 웹 푸시 구독 등록 및 비활성화
-  - 알림 레코드와 채널별 전송 레코드의 분리 정의
-  - 웹 푸시를 위한 기본 알림 생성 및 전송 흐름 지원
-- 2단계:
-  - Todo 날짜/시간 필드를 기준으로 리마인더 예약 기능 추가
-  - Todo가 완료되거나 삭제되면 예약된 리마인더를 취소하거나 억제
-- 3단계:
-  - 모바일 푸시 대상과 FCM, APNS 같은 채널별 발송기 추가
-
-### Notification Behavior
-- 웹 푸시 구독은 등록한 인증 회원 본인에게 속해야 한다.
-- 회원은 브라우저나 기기별로 여러 알림 수신 대상을 가질 수 있다.
-- 알림 데이터는 실제 전송 시도 이력과 분리해서 관리해야 한다.
-- 전송 이력은 대기, 전송 완료, 실패, 만료 상태를 추적해야 한다.
-- 푸시 대상이 유효하지 않게 되면 이후 전송에서는 더 이상 사용하지 않아야 한다.
-
-### Notification Data Planning
-- 알림 기능에는 다음과 같은 주요 개념이 도입될 것으로 예상한다.
-  - `notification`
-  - `notification_delivery`
-  - `notification_preference`
-  - `push_subscription`
-- 이후 앱 푸시가 추가되면 별도의 디바이스 토큰 형태 대상을 도입해야 한다.
-- 실제 리마인더 예약을 위해 Todo에는 다음과 같은 시간 관련 필드가 필요할 가능성이 높다.
-  - `due_at`
-  - `remind_at`
-  - `reminder_enabled`
-
-### Notification API Notes
-- 백엔드에는 다음과 같은 인증 API가 필요할 가능성이 높다.
-  - 웹 푸시 구독 등록
-  - 웹 푸시 구독 비활성화
-  - 회원 알림 목록 조회
-  - 회원 알림 설정 조회 및 수정
+- 푸시 알림 발송 기능은 아직 구현하지 않았다.
+- 현재는 Todo 알림 규칙 모델만 정의되어 있다.
+- 실제 알림 발송 이력과 채널 관리는 이후 `notification`, `notification_delivery`, `notification_preference`, `push_subscription` 등의 모델로 확장할 수 있다.

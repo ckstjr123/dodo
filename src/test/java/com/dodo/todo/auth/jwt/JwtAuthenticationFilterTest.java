@@ -45,7 +45,7 @@ class JwtAuthenticationFilterTest {
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
         MockHttpServletRequest request = requestWithBearerToken("valid-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        MemberPrincipal principal = new MemberPrincipal(3L, "user@example.com", "encoded", "user");
+        MemberPrincipal principal = new MemberPrincipal(3L, "user@example.com");
 
         when(jwtTokenProvider.isValidAccessToken("valid-token")).thenReturn(true);
         when(jwtTokenProvider.getMemberId("valid-token")).thenReturn(3L);
