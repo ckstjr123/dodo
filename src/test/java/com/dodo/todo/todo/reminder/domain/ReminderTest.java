@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 class ReminderTest {
 
     @Test
-    @DisplayName("마감 기준 알림은 분 단위의 remindBefore로 생성한다")
+    @DisplayName("마감 기준 알림은 분 단위 remindBefore로 생성된다")
     void createRelativeReminder() {
         Reminder reminder = Reminder.relativeToDue(1L, 5);
 
@@ -21,7 +21,7 @@ class ReminderTest {
     }
 
     @Test
-    @DisplayName("절대 시각 알림은 remindAt으로 생성한다")
+    @DisplayName("절대 시각 알림은 remindAt으로 생성된다")
     void createAbsoluteReminder() {
         LocalDateTime remindAt = LocalDateTime.of(2026, 4, 6, 9, 0);
         Reminder reminder = Reminder.absoluteAt(1L, remindAt);
@@ -72,4 +72,32 @@ class ReminderTest {
         assertThat(reminder.getRemindAt()).isEqualTo(remindAt);
     }
 
+    @Test
+    @DisplayName("잘못된 마감 기준 알림으로 수정에 실패하면 기존 상태를 유지한다")
+    void keepPreviousStateWhenUpdateRelativeToDueFails() {
+        LocalDateTime remindAt = LocalDateTime.of(2026, 4, 6, 9, 0);
+        Reminder reminder = Reminder.absoluteAt(1L, remindAt);
+
+        assertThatThrownBy(() -> reminder.updateRelativeToDue(0))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Relative reminder requires remindBefore of at least 1 minute");
+
+        assertThat(reminder.getReminderType()).isEqualTo(ReminderType.ABSOLUTE_AT);
+        assertThat(reminder.getRemindBefore()).isNull();
+        assertThat(reminder.getRemindAt()).isEqualTo(remindAt);
+    }
+
+    @Test
+    @DisplayName("잘못된 절대 시각 알림으로 수정에 실패하면 기존 상태를 유지한다")
+    void keepPreviousStateWhenUpdateAbsoluteAtFails() {
+        Reminder reminder = Reminder.relativeToDue(1L, 10);
+
+        assertThatThrownBy(() -> reminder.updateAbsoluteAt(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Absolute reminder requires remindAt");
+
+        assertThat(reminder.getReminderType()).isEqualTo(ReminderType.RELATIVE_TO_DUE);
+        assertThat(reminder.getRemindBefore()).isEqualTo(10);
+        assertThat(reminder.getRemindAt()).isNull();
+    }
 }

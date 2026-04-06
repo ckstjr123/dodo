@@ -15,7 +15,7 @@ import com.dodo.todo.auth.dto.SocialLoginRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
-import com.dodo.todo.auth.social.client.GoogleAuthClient;
+import com.dodo.todo.auth.social.client.OAuthClient;
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
@@ -46,7 +46,7 @@ class AuthServiceTest {
     private CustomUserDetailsService customUserDetailsService;
 
     @Mock
-    private GoogleAuthClient googleAuthClient;
+    private OAuthClient oAuthClient;
 
     private AuthService authService;
     private JwtTokenProvider jwtTokenProvider;
@@ -59,13 +59,13 @@ class AuthServiceTest {
                 refreshTokenRepository,
                 jwtTokenProvider,
                 customUserDetailsService,
-                googleAuthClient
+                List.of(oAuthClient)
         );
     }
 
     @Test
     @DisplayName("소셜 로그인 시 기존 회원 이메일과 일치하면 기존 회원으로 JWT를 발급한다")
-    void socialLoginReturnsTokenForExistingMember() {
+    void loginReturnsTokenForExistingMember() {
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
                 "google-code",
@@ -81,14 +81,15 @@ class AuthServiceTest {
 
         when(member.getId()).thenReturn(1L);
         when(member.getEmail()).thenReturn("google@example.com");
-        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(true);
+        when(oAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
         when(memberRepository.findByEmail("google@example.com")).thenReturn(Optional.of(member));
         when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of());
 
-        TokenResponse response = authService.socialLogin(request);
+        TokenResponse response = authService.login(request);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
@@ -97,7 +98,7 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("소셜 로그인 시 처음 로그인한 이메일이면 회원을 생성한다")
-    void socialLoginCreatesMemberForNewEmail() {
+    void loginCreatesMemberForNewEmail() {
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
                 "google-code",
@@ -113,7 +114,8 @@ class AuthServiceTest {
 
         when(savedMember.getId()).thenReturn(1L);
         when(savedMember.getEmail()).thenReturn("new-google@example.com");
-        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(true);
+        when(oAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
         when(memberRepository.findByEmail("new-google@example.com")).thenReturn(Optional.empty());
         when(memberRepository.save(org.mockito.ArgumentMatchers.any(Member.class))).thenReturn(savedMember);
         when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
@@ -121,7 +123,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of());
 
-        authService.socialLogin(request);
+        authService.login(request);
 
         ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
         verify(memberRepository).save(captor.capture());
@@ -130,7 +132,7 @@ class AuthServiceTest {
 
     @Test
     @DisplayName("소셜 로그인 회원 생성 중 경합이 발생하면 저장된 회원을 다시 조회해 사용한다")
-    void socialLoginReusesMemberWhenConcurrentSignupOccurs() {
+    void loginReusesMemberWhenConcurrentSignupOccurs() {
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
                 "google-code",
@@ -146,7 +148,8 @@ class AuthServiceTest {
 
         when(existingMember.getId()).thenReturn(1L);
         when(existingMember.getEmail()).thenReturn("google@example.com");
-        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(true);
+        when(oAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
         when(memberRepository.findByEmail("google@example.com"))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(existingMember));
@@ -157,14 +160,14 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of());
 
-        TokenResponse response = authService.socialLogin(request);
+        TokenResponse response = authService.login(request);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
     }
 
     @Test
     @DisplayName("이메일 인증이 되지 않은 소셜 계정이면 로그인에 실패한다")
-    void socialLoginRejectsUnverifiedEmail() {
+    void loginRejectsUnverifiedEmail() {
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
                 "google-code",
@@ -177,23 +180,24 @@ class AuthServiceTest {
                 false
         );
 
-        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(true);
+        when(oAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
 
-        assertThatThrownBy(() -> authService.socialLogin(request))
+        assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Social account email is not verified");
     }
 
     @Test
     @DisplayName("지원하지 않는 제공자로 소셜 로그인하면 실패한다")
-    void socialLoginRejectsUnsupportedProvider() {
+    void loginRejectsUnsupportedProvider() {
         SocialLoginRequest request = new SocialLoginRequest(
                 "UNKNOWN",
                 "google-code",
                 "http://localhost:5173/auth/callback"
         );
 
-        assertThatThrownBy(() -> authService.socialLogin(request))
+        assertThatThrownBy(() -> authService.login(request))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Unsupported social provider");
     }
@@ -203,14 +207,20 @@ class AuthServiceTest {
     void refreshReturnsNewTokenPair() {
         MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        RefreshToken storedRefreshToken = RefreshToken.builder()
-                .memberId(1L)
-                .token(refreshToken)
-                .expiredAt(LocalDateTime.now().plusDays(1))
-                .build();
+        RefreshToken storedRefreshToken = mock(RefreshToken.class);
 
+        when(storedRefreshToken.getId()).thenReturn(10L);
+        when(storedRefreshToken.getToken()).thenReturn(refreshToken);
+        when(storedRefreshToken.isExpired(org.mockito.ArgumentMatchers.any(LocalDateTime.class))).thenReturn(false);
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
         when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
+        when(refreshTokenRepository.rotateToken(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq(refreshToken),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
+        )).thenReturn(1);
         when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of(mock(RefreshToken.class), mock(RefreshToken.class)));
 
@@ -219,8 +229,13 @@ class AuthServiceTest {
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
         assertThat(response.tokenType()).isEqualTo("Bearer");
-        assertThat(storedRefreshToken.getToken()).isEqualTo(response.refreshToken());
-        assertThat(storedRefreshToken.getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
+        verify(refreshTokenRepository).rotateToken(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq(refreshToken),
+                org.mockito.ArgumentMatchers.eq(response.refreshToken()),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
+        );
         verify(refreshTokenRepository, never()).delete(storedRefreshToken);
     }
 
@@ -254,6 +269,31 @@ class AuthServiceTest {
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Refresh token is invalid");
         verify(refreshTokenRepository).delete(storedRefreshToken);
+    }
+
+    @Test
+    @DisplayName("동시에 다른 요청이 먼저 회전한 리프레시 토큰이면 재발급에 실패한다")
+    void refreshRejectsRefreshTokenWhenConcurrentRotationAlreadyUpdatedIt() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+        RefreshToken storedRefreshToken = mock(RefreshToken.class);
+
+        when(storedRefreshToken.getId()).thenReturn(10L);
+        when(storedRefreshToken.getToken()).thenReturn(refreshToken);
+        when(storedRefreshToken.isExpired(org.mockito.ArgumentMatchers.any(LocalDateTime.class))).thenReturn(false);
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
+        when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
+        when(refreshTokenRepository.rotateToken(
+                org.mockito.ArgumentMatchers.eq(10L),
+                org.mockito.ArgumentMatchers.eq(refreshToken),
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class),
+                org.mockito.ArgumentMatchers.any(LocalDateTime.class)
+        )).thenReturn(0);
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Refresh token is invalid");
     }
 
     @Test

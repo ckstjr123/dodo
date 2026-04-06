@@ -21,7 +21,7 @@ import org.springframework.web.client.RestTemplate;
 
 @Slf4j
 @Component
-public class GoogleApiAuthClient implements GoogleAuthClient {
+public class GoogleApiAuthClient implements OAuthClient {
 
     static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     static final String GOOGLE_USER_INFO_URL = "https://openidconnect.googleapis.com/v1/userinfo";
@@ -43,6 +43,11 @@ public class GoogleApiAuthClient implements GoogleAuthClient {
         this.restTemplate = restTemplate;
         this.clientId = clientId;
         this.clientSecret = clientSecret;
+    }
+
+    @Override
+    public boolean supports(SocialProvider provider) {
+        return provider == SocialProvider.GOOGLE;
     }
 
     @Override

@@ -8,7 +8,7 @@ import com.dodo.todo.auth.dto.SocialLoginRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
-import com.dodo.todo.auth.social.client.GoogleAuthClient;
+import com.dodo.todo.auth.social.client.OAuthClient;
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
@@ -32,10 +32,10 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
-    private final GoogleAuthClient googleAuthClient;
+    private final List<OAuthClient> oAuthClients;
 
     @Transactional
-    public TokenResponse socialLogin(SocialLoginRequest request) {
+    public TokenResponse login(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
         OAuthUserInfo userInfo = authenticate(provider, request.authorizationCode(), request.redirectUri());
         validateOAuthUserInfo(userInfo);
@@ -52,8 +52,9 @@ public class AuthService {
 
         RefreshToken storedRefreshToken = refreshTokenRepository.findByToken(request.refreshToken())
                 .orElseThrow(() -> new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid"));
+        LocalDateTime now = LocalDateTime.now();
 
-        if (storedRefreshToken.isExpired(LocalDateTime.now())) {
+        if (storedRefreshToken.isExpired(now)) {
             refreshTokenRepository.delete(storedRefreshToken);
             throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
@@ -63,10 +64,18 @@ public class AuthService {
 
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        storedRefreshToken.rotate(
+        LocalDateTime expiredAt = now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds());
+        // 기존 토큰값을 조건으로 갱신해 동시 refresh 요청이 같은 세션을 덮어쓰지 못하게 막는다.
+        int updatedCount = refreshTokenRepository.rotateToken(
+                storedRefreshToken.getId(),
+                request.refreshToken(),
                 refreshToken,
-                LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
+                expiredAt,
+                now
         );
+        if (updatedCount == 0) {
+            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+        }
         cleanUpRefreshTokens(memberId);
 
         return new TokenResponse(accessToken, refreshToken, "Bearer");
@@ -90,9 +99,17 @@ public class AuthService {
     }
 
     private OAuthUserInfo authenticate(SocialProvider provider, String authorizationCode, String redirectUri) {
-        return switch (provider) {
-            case GOOGLE -> googleAuthClient.authenticate(authorizationCode, redirectUri);
-        };
+        OAuthClient oAuthClient = oAuthClients.stream()
+                .filter(client -> client.supports(provider))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        "UNSUPPORTED_SOCIAL_PROVIDER",
+                        HttpStatus.BAD_REQUEST,
+                        "Unsupported social provider"
+                ));
+
+        // provider별 구현체를 선택해도 AuthService의 로그인 흐름은 하나로 유지한다.
+        return oAuthClient.authenticate(authorizationCode, redirectUri);
     }
 
     private void validateOAuthUserInfo(OAuthUserInfo userInfo) {

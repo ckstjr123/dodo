@@ -24,7 +24,7 @@ public class AuthController implements AuthApiDocs {
     @Override
     @PostMapping("/social/login")
     public TokenResponse socialLogin(@Valid @RequestBody SocialLoginRequest request) {
-        return authService.socialLogin(request);
+        return authService.login(request);
     }
 
     @Override
