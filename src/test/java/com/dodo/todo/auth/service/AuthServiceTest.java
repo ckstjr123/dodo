@@ -2,33 +2,36 @@ package com.dodo.todo.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.auth.config.JwtProperties;
-import com.dodo.todo.auth.dto.LoginRequest;
-import com.dodo.todo.auth.dto.LoginResponse;
-import com.dodo.todo.auth.dto.MemberResponse;
+import com.dodo.todo.auth.domain.RefreshToken;
+import com.dodo.todo.auth.domain.RefreshTokenRepository;
 import com.dodo.todo.auth.dto.RefreshTokenRequest;
-import com.dodo.todo.auth.dto.SignupRequest;
+import com.dodo.todo.auth.dto.SocialLoginRequest;
+import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
+import com.dodo.todo.auth.social.client.GoogleAuthClient;
+import com.dodo.todo.auth.social.domain.OAuthUserInfo;
+import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.domain.MemberRepository;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.dao.DataIntegrityViolationException;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -37,120 +40,256 @@ class AuthServiceTest {
     private MemberRepository memberRepository;
 
     @Mock
-    private AuthenticationManager authenticationManager;
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Mock
     private CustomUserDetailsService customUserDetailsService;
 
+    @Mock
+    private GoogleAuthClient googleAuthClient;
+
     private AuthService authService;
-    private PasswordEncoder passwordEncoder;
     private JwtTokenProvider jwtTokenProvider;
 
     @BeforeEach
     void setUp() {
-        passwordEncoder = new BCryptPasswordEncoder();
         jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
         authService = new AuthService(
                 memberRepository,
-                passwordEncoder,
-                authenticationManager,
+                refreshTokenRepository,
                 jwtTokenProvider,
-                customUserDetailsService
+                customUserDetailsService,
+                googleAuthClient
         );
     }
 
     @Test
-    @DisplayName("회원 가입 시 비밀번호를 암호화해 저장한다")
-    void signupCreatesMemberWithEncodedPassword() {
-        SignupRequest request = new SignupRequest("user@example.com", "password123", "user");
-        AtomicReference<Member> savedMemberRef = new AtomicReference<>();
+    @DisplayName("소셜 로그인 시 기존 회원 이메일과 일치하면 기존 회원으로 JWT를 발급한다")
+    void socialLoginReturnsTokenForExistingMember() {
+        SocialLoginRequest request = new SocialLoginRequest(
+                "GOOGLE",
+                "google-code",
+                "http://localhost:5173/auth/callback"
+        );
+        Member member = mock(Member.class);
+        OAuthUserInfo userInfo = new OAuthUserInfo(
+                SocialProvider.GOOGLE,
+                "google-123",
+                "google@example.com",
+                true
+        );
 
-        when(memberRepository.existsByEmail(request.email())).thenReturn(false);
-        when(memberRepository.save(any(Member.class))).thenAnswer(invocation -> {
-            Member member = invocation.getArgument(0);
-            savedMemberRef.set(member);
-            return member;
-        });
+        when(member.getId()).thenReturn(1L);
+        when(member.getEmail()).thenReturn("google@example.com");
+        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(memberRepository.findByEmail("google@example.com")).thenReturn(Optional.of(member));
+        when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
 
-        MemberResponse response = authService.signup(request);
-        Member savedMember = savedMemberRef.get();
+        TokenResponse response = authService.socialLogin(request);
 
-        assertThat(savedMember).isNotNull();
-        assertThat(response.email()).isEqualTo("user@example.com");
-        assertThat(response.nickname()).isEqualTo("user");
-        assertThat(response.id()).isNull();
-        assertThat(savedMember.getPassword()).isNotEqualTo("password123");
-        assertThat(passwordEncoder.matches("password123", savedMember.getPassword())).isTrue();
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
+        verify(memberRepository, never()).save(org.mockito.ArgumentMatchers.any(Member.class));
     }
 
     @Test
-    @DisplayName("회원 가입 시 중복 이메일이면 예외가 발생한다")
-    void signupRejectsDuplicateEmail() {
-        SignupRequest request = new SignupRequest("dup@example.com", "password123", "dup");
-        when(memberRepository.existsByEmail(request.email())).thenReturn(true);
+    @DisplayName("소셜 로그인 시 처음 로그인한 이메일이면 회원을 생성한다")
+    void socialLoginCreatesMemberForNewEmail() {
+        SocialLoginRequest request = new SocialLoginRequest(
+                "GOOGLE",
+                "google-code",
+                "http://localhost:5173/auth/callback"
+        );
+        OAuthUserInfo userInfo = new OAuthUserInfo(
+                SocialProvider.GOOGLE,
+                "google-123",
+                "new-google@example.com",
+                true
+        );
+        Member savedMember = mock(Member.class);
 
-        assertThatThrownBy(() -> authService.signup(request))
+        when(savedMember.getId()).thenReturn(1L);
+        when(savedMember.getEmail()).thenReturn("new-google@example.com");
+        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(memberRepository.findByEmail("new-google@example.com")).thenReturn(Optional.empty());
+        when(memberRepository.save(org.mockito.ArgumentMatchers.any(Member.class))).thenReturn(savedMember);
+        when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
+
+        authService.socialLogin(request);
+
+        ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
+        verify(memberRepository).save(captor.capture());
+        assertThat(captor.getValue().getEmail()).isEqualTo("new-google@example.com");
+    }
+
+    @Test
+    @DisplayName("소셜 로그인 회원 생성 중 경합이 발생하면 저장된 회원을 다시 조회해 사용한다")
+    void socialLoginReusesMemberWhenConcurrentSignupOccurs() {
+        SocialLoginRequest request = new SocialLoginRequest(
+                "GOOGLE",
+                "google-code",
+                "http://localhost:5173/auth/callback"
+        );
+        OAuthUserInfo userInfo = new OAuthUserInfo(
+                SocialProvider.GOOGLE,
+                "google-123",
+                "google@example.com",
+                true
+        );
+        Member existingMember = mock(Member.class);
+
+        when(existingMember.getId()).thenReturn(1L);
+        when(existingMember.getEmail()).thenReturn("google@example.com");
+        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+        when(memberRepository.findByEmail("google@example.com"))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(existingMember));
+        when(memberRepository.save(org.mockito.ArgumentMatchers.any(Member.class)))
+                .thenThrow(new DataIntegrityViolationException("duplicate email"));
+        when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
+
+        TokenResponse response = authService.socialLogin(request);
+
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+    }
+
+    @Test
+    @DisplayName("이메일 인증이 되지 않은 소셜 계정이면 로그인에 실패한다")
+    void socialLoginRejectsUnverifiedEmail() {
+        SocialLoginRequest request = new SocialLoginRequest(
+                "GOOGLE",
+                "google-code",
+                "http://localhost:5173/auth/callback"
+        );
+        OAuthUserInfo userInfo = new OAuthUserInfo(
+                SocialProvider.GOOGLE,
+                "google-123",
+                "google@example.com",
+                false
+        );
+
+        when(googleAuthClient.authenticate(request.authorizationCode(), request.redirectUri())).thenReturn(userInfo);
+
+        assertThatThrownBy(() -> authService.socialLogin(request))
                 .isInstanceOf(ApiException.class)
-                .hasMessage("Email already exists");
+                .hasMessage("Social account email is not verified");
     }
 
     @Test
-    @DisplayName("로그인 성공 시 access 토큰과 refresh 토큰을 함께 반환한다")
-    void loginReturnsTokenAndMember() {
-        LoginRequest request = new LoginRequest("login@example.com", "password123");
-        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com", "encoded", "login-user");
-        UsernamePasswordAuthenticationToken authentication =
-                UsernamePasswordAuthenticationToken.authenticated(principal, null, principal.getAuthorities());
+    @DisplayName("지원하지 않는 제공자로 소셜 로그인하면 실패한다")
+    void socialLoginRejectsUnsupportedProvider() {
+        SocialLoginRequest request = new SocialLoginRequest(
+                "UNKNOWN",
+                "google-code",
+                "http://localhost:5173/auth/callback"
+        );
 
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(authentication);
-
-        LoginResponse response = authService.login(request);
-
-        assertThat(jwtTokenProvider.isValidAccessToken(response.token().accessToken())).isTrue();
-        assertThat(jwtTokenProvider.isValidRefreshToken(response.token().refreshToken())).isTrue();
-        assertThat(jwtTokenProvider.getMemberId(response.token().accessToken())).isEqualTo(1L);
-        assertThat(response.token().tokenType()).isEqualTo("Bearer");
-        assertThat(response.token().expiresIn()).isEqualTo(1800L);
-        assertThat(response.token().refreshTokenExpiresIn()).isEqualTo(604800L);
-        assertThat(response.member().email()).isEqualTo("login@example.com");
+        assertThatThrownBy(() -> authService.socialLogin(request))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Unsupported social provider");
     }
 
     @Test
-    @DisplayName("리프레시 토큰으로 새 토큰 쌍을 재발급한다")
+    @DisplayName("리프레시 토큰이 DB에 존재하고 유효해야 재발급할 수 있다")
     void refreshReturnsNewTokenPair() {
-        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com", "encoded", "login-user");
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+        RefreshToken storedRefreshToken = RefreshToken.builder()
+                .memberId(1L)
+                .token(refreshToken)
+                .expiredAt(LocalDateTime.now().plusDays(1))
+                .build();
 
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
         when(customUserDetailsService.loadUserById(1L)).thenReturn(principal);
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of(mock(RefreshToken.class), mock(RefreshToken.class)));
 
         var response = authService.refresh(new RefreshTokenRequest(refreshToken));
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
-        assertThat(jwtTokenProvider.getMemberId(response.refreshToken())).isEqualTo(1L);
-        assertThat(response.expiresIn()).isEqualTo(1800L);
-        assertThat(response.refreshTokenExpiresIn()).isEqualTo(604800L);
+        assertThat(response.tokenType()).isEqualTo("Bearer");
+        assertThat(storedRefreshToken.getToken()).isEqualTo(response.refreshToken());
+        assertThat(storedRefreshToken.getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
+        verify(refreshTokenRepository, never()).delete(storedRefreshToken);
     }
 
     @Test
-    @DisplayName("유효하지 않은 리프레시 토큰이면 예외가 발생한다")
-    void refreshRejectsInvalidRefreshToken() {
-        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest("bad-refresh-token")))
+    @DisplayName("DB에 없는 리프레시 토큰이면 예외가 발생한다")
+    void refreshRejectsMissingRefreshToken() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Refresh token is invalid");
     }
 
     @Test
-    @DisplayName("로그인 시 자격 증명이 틀리면 예외가 발생한다")
-    void loginRejectsInvalidCredentials() {
-        LoginRequest request = new LoginRequest("login@example.com", "wrong-password");
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenThrow(new BadCredentialsException("Bad credentials"));
+    @DisplayName("만료된 리프레시 토큰이면 삭제 후 예외가 발생한다")
+    void refreshRejectsExpiredRefreshToken() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+        RefreshToken storedRefreshToken = RefreshToken.builder()
+                .memberId(1L)
+                .token(refreshToken)
+                .expiredAt(LocalDateTime.now().minusMinutes(1))
+                .build();
 
-        assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(BadCredentialsException.class)
-                .hasMessage("Bad credentials");
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
+
+        assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Refresh token is invalid");
+        verify(refreshTokenRepository).delete(storedRefreshToken);
+    }
+
+    @Test
+    @DisplayName("새 세션 발급 시 최근 사용 2세션만 유지한다")
+    void issueTokenResponseKeepsOnlyTwoLatestRefreshTokens() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        RefreshToken first = mock(RefreshToken.class);
+        RefreshToken second = mock(RefreshToken.class);
+        RefreshToken third = mock(RefreshToken.class);
+
+        when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of(first, second, third));
+
+        var response = authService.issueTokenResponse(principal);
+
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
+        verify(refreshTokenRepository).deleteAll(List.of(third));
+    }
+
+    @Test
+    @DisplayName("리프레시 토큰 저장 시 만료 시각을 함께 저장한다")
+    void issueTokenResponseStoresRefreshTokenExpiration() {
+        MemberPrincipal principal = new MemberPrincipal(1L, "login@example.com");
+        when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(1L))
+                .thenReturn(List.of());
+
+        authService.issueTokenResponse(principal);
+
+        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository).save(captor.capture());
+        assertThat(captor.getValue().getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
     }
 
     @Test
@@ -161,6 +300,19 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.getCurrentMember(99L))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Member not found");
+    }
+
+    @Test
+    @DisplayName("현재 회원 조회 시 회원 정보를 반환한다")
+    void getCurrentMemberReturnsMember() {
+        Member member = Member.builder()
+                .email("me@example.com")
+                .build();
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(member));
+
+        var response = authService.getCurrentMember(1L);
+
+        assertThat(response.email()).isEqualTo("me@example.com");
     }
 
     private JwtProperties jwtProperties(long accessExpirationSeconds, long refreshExpirationSeconds) {
