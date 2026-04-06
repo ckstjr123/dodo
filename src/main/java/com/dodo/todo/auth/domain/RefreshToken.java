@@ -6,6 +6,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -53,7 +54,6 @@ public class RefreshToken {
     public void rotate(String token, LocalDateTime expiredAt) {
         this.token = token;
         this.expiredAt = expiredAt;
-        this.updatedAt = LocalDateTime.now();
     }
 
     @PrePersist
@@ -61,5 +61,10 @@ public class RefreshToken {
         LocalDateTime now = LocalDateTime.now();
         this.createdAt = now;
         this.updatedAt = now;
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }
