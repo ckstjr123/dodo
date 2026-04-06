@@ -13,7 +13,7 @@ class JwtTokenProviderTest {
     @DisplayName("access 토큰을 생성하고 회원 ID를 다시 읽을 수 있다")
     void generatesAndParsesValidAccessToken() {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com", "encoded", "user");
+        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com");
 
         String token = jwtTokenProvider.generateAccessToken(principal);
 
@@ -27,13 +27,25 @@ class JwtTokenProviderTest {
     @DisplayName("refresh 토큰을 생성하고 타입을 구분한다")
     void generatesValidRefreshToken() {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com", "encoded", "user");
+        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com");
 
         String token = jwtTokenProvider.generateRefreshToken(principal);
 
         assertThat(jwtTokenProvider.isValidRefreshToken(token)).isTrue();
         assertThat(jwtTokenProvider.isValidAccessToken(token)).isFalse();
         assertThat(jwtTokenProvider.getRefreshTokenExpirationSeconds()).isEqualTo(604800L);
+    }
+
+    @Test
+    @DisplayName("같은 회원에게 연속 발급한 refresh 토큰은 jti로 인해 서로 달라진다")
+    void generatesDistinctRefreshTokensForSameMember() {
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
+        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com");
+
+        String firstToken = jwtTokenProvider.generateRefreshToken(principal);
+        String secondToken = jwtTokenProvider.generateRefreshToken(principal);
+
+        assertThat(firstToken).isNotEqualTo(secondToken);
     }
 
     @Test
@@ -50,7 +62,7 @@ class JwtTokenProviderTest {
     @DisplayName("만료된 access 토큰은 유효하지 않다")
     void rejectsExpiredAccessToken() {
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(-1L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com", "encoded", "user");
+        MemberPrincipal principal = new MemberPrincipal(7L, "user@example.com");
 
         String token = jwtTokenProvider.generateAccessToken(principal);
 

@@ -20,9 +20,18 @@ reviews:
     - "!dist/**"
     - "!node_modules/**"
   auto_review:
-    enabled: true
+    enabled: false
     auto_incremental_review: true
-    drafts: true
 
 chat:
   auto_reply: true
+
+knowledge_base:
+  web_search:
+    enabled: true
+  learnings:
+    scope: local
+  issues:
+    scope: local
+  pull_requests:
+    scope: local

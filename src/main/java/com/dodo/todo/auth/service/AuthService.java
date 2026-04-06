@@ -1,23 +1,24 @@
 package com.dodo.todo.auth.service;
 
-import com.dodo.todo.auth.dto.LoginRequest;
-import com.dodo.todo.auth.dto.LoginResponse;
+import com.dodo.todo.auth.domain.RefreshToken;
+import com.dodo.todo.auth.domain.RefreshTokenRepository;
 import com.dodo.todo.auth.dto.MemberResponse;
 import com.dodo.todo.auth.dto.RefreshTokenRequest;
-import com.dodo.todo.auth.dto.SignupRequest;
+import com.dodo.todo.auth.dto.SocialLoginRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
+import com.dodo.todo.auth.social.client.OAuthClient;
+import com.dodo.todo.auth.social.domain.OAuthUserInfo;
+import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.domain.MemberRepository;
+import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,53 +26,49 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class AuthService {
 
+    private static final int MAX_REFRESH_TOKEN_SESSIONS = 2;
+
     private final MemberRepository memberRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final AuthenticationManager authenticationManager;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final CustomUserDetailsService customUserDetailsService;
+    private final List<OAuthClient> oAuthClients;
+
+    public TokenResponse login(SocialLoginRequest request) {
+        SocialProvider provider = SocialProvider.from(request.provider());
+        OAuthUserInfo userInfo = authenticate(provider, request.authorizationCode(), request.redirectUri());
+        validateOAuthUserInfo(userInfo);
+
+        return completeLogin(userInfo);
+    }
 
     @Transactional
-    public MemberResponse signup(SignupRequest request) {
-        if (memberRepository.existsByEmail(request.email())) {
-            throw new ApiException("EMAIL_ALREADY_EXISTS", HttpStatus.CONFLICT, "Email already exists");
-        }
-
-        Member member = memberRepository.save(Member.builder()
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .nickname(request.nickname())
-                .build());
-
-        return toMemberResponse(member);
-    }
-
-    @Transactional(readOnly = true)
-    public LoginResponse login(LoginRequest request) {
-
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
-        );
-
-        MemberPrincipal principal = (MemberPrincipal) authentication.getPrincipal();
-
-        return new LoginResponse(
-                createTokenResponse(principal),
-                new MemberResponse(principal.getId(), principal.getEmail(), principal.getNickname())
-        );
-    }
-
-    @Transactional(readOnly = true)
     public TokenResponse refresh(RefreshTokenRequest request) {
         if (!jwtTokenProvider.isValidRefreshToken(request.refreshToken())) {
             throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
 
-        Long memberId = jwtTokenProvider.getMemberId(request.refreshToken());
+        RefreshToken storedRefreshToken = refreshTokenRepository.findByToken(request.refreshToken())
+                .orElseThrow(() -> new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid"));
+        LocalDateTime now = LocalDateTime.now();
+
+        if (storedRefreshToken.isExpired(now)) {
+            refreshTokenRepository.delete(storedRefreshToken);
+            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+        }
+
+        Long memberId = jwtTokenProvider.getMemberId(storedRefreshToken.getToken());
         MemberPrincipal principal = customUserDetailsService.loadUserById(memberId);
 
-        // 리프레시 토큰 재발급 시 access/refresh 토큰 쌍을 함께 갱신한다.
-        return createTokenResponse(principal);
+        String accessToken = jwtTokenProvider.generateAccessToken(principal);
+        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+        storedRefreshToken.rotate(
+                refreshToken,
+                now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
+        );
+        cleanUpRefreshTokens(memberId);
+
+        return new TokenResponse(accessToken, refreshToken, "Bearer");
     }
 
     @Transactional(readOnly = true)
@@ -79,23 +76,98 @@ public class AuthService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
 
-        return toMemberResponse(member);
+        return new MemberResponse(member.getId(), member.getEmail());
     }
 
-    private MemberResponse toMemberResponse(Member member) {
-        return new MemberResponse(member.getId(), member.getEmail(), member.getNickname());
-    }
-
-    private TokenResponse createTokenResponse(MemberPrincipal principal) {
+    @Transactional
+    public TokenResponse issueTokenResponse(MemberPrincipal principal) {
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
+        createRefreshToken(principal.getId(), refreshToken);
 
-        return new TokenResponse(
-                accessToken,
-                refreshToken,
-                "Bearer",
-                jwtTokenProvider.getAccessTokenExpirationSeconds(),
-                jwtTokenProvider.getRefreshTokenExpirationSeconds()
-        );
+        return new TokenResponse(accessToken, refreshToken, "Bearer");
+    }
+
+    @Transactional
+    protected TokenResponse completeLogin(OAuthUserInfo userInfo) {
+        Member member = findOrCreateMember(userInfo.email());
+        return issueTokenResponse(new MemberPrincipal(member.getId(), member.getEmail()));
+    }
+
+    private OAuthUserInfo authenticate(SocialProvider provider, String authorizationCode, String redirectUri) {
+        OAuthClient oAuthClient = oAuthClients.stream()
+                .filter(client -> client.supports(provider))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        "UNSUPPORTED_SOCIAL_PROVIDER",
+                        HttpStatus.BAD_REQUEST,
+                        "Unsupported social provider"
+                ));
+
+        // provider별 구현체를 선택해도 로그인 진입점과 후속 흐름은 하나로 유지한다.
+        return oAuthClient.authenticate(authorizationCode, redirectUri);
+    }
+
+    private void validateOAuthUserInfo(OAuthUserInfo userInfo) {
+        if (userInfo.providerUserId() == null || userInfo.providerUserId().isBlank()) {
+            throw new ApiException(
+                    "SOCIAL_AUTHENTICATION_FAILED",
+                    HttpStatus.UNAUTHORIZED,
+                    "Social account id is missing"
+            );
+        }
+
+        if (userInfo.email() == null || userInfo.email().isBlank()) {
+            throw new ApiException(
+                    "SOCIAL_AUTHENTICATION_FAILED",
+                    HttpStatus.UNAUTHORIZED,
+                    "Social account email is missing"
+            );
+        }
+
+        if (!userInfo.emailVerified()) {
+            throw new ApiException(
+                    "SOCIAL_AUTHENTICATION_FAILED",
+                    HttpStatus.UNAUTHORIZED,
+                    "Social account email is not verified"
+            );
+        }
+    }
+
+    private Member findOrCreateMember(String email) {
+        return memberRepository.findByEmail(email)
+                .orElseGet(() -> createMember(email));
+    }
+
+    private Member createMember(String email) {
+        try {
+            return memberRepository.save(Member.builder()
+                    .email(email)
+                    .build());
+        } catch (DataIntegrityViolationException exception) {
+            // 동시 가입 경합이 나면 이미 저장된 회원을 다시 조회해 재사용한다.
+            return memberRepository.findByEmail(email)
+                    .orElseThrow(() -> exception);
+        }
+    }
+
+    private void createRefreshToken(Long memberId, String token) {
+        RefreshToken refreshToken = RefreshToken.builder()
+                .memberId(memberId)
+                .token(token)
+                .expiredAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds()))
+                .build();
+        refreshTokenRepository.save(refreshToken);
+        cleanUpRefreshTokens(memberId);
+    }
+
+    private void cleanUpRefreshTokens(Long memberId) {
+        // 최근 사용 기준으로 최신 2세션만 남긴다.
+        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(memberId);
+        if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
+            return;
+        }
+
+        refreshTokenRepository.deleteAll(refreshTokens.subList(MAX_REFRESH_TOKEN_SESSIONS, refreshTokens.size()));
     }
 }
