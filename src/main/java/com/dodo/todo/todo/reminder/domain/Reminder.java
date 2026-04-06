@@ -51,11 +51,11 @@ public class Reminder {
             LocalDateTime remindAt
     ) {
         validateTodoId(todoId);
+        validateReminderFields(reminderType, remindBefore, remindAt);
         this.todoId = todoId;
         this.reminderType = reminderType;
         this.remindBefore = remindBefore;
         this.remindAt = remindAt;
-        validateReminderFields();
     }
 
     public static Reminder relativeToDue(Long todoId, int remindBefore) {
@@ -67,17 +67,17 @@ public class Reminder {
     }
 
     public void updateRelativeToDue(int remindBefore) {
+        validateReminderFields(ReminderType.RELATIVE_TO_DUE, remindBefore, null);
         this.reminderType = ReminderType.RELATIVE_TO_DUE;
         this.remindBefore = remindBefore;
         this.remindAt = null;
-        validateReminderFields();
     }
 
     public void updateAbsoluteAt(LocalDateTime remindAt) {
+        validateReminderFields(ReminderType.ABSOLUTE_AT, null, remindAt);
         this.reminderType = ReminderType.ABSOLUTE_AT;
         this.remindBefore = null;
         this.remindAt = remindAt;
-        validateReminderFields();
     }
 
     private void validateTodoId(Long todoId) {
@@ -86,8 +86,12 @@ public class Reminder {
         }
     }
 
-    private void validateReminderFields() {
-        // 마감 기준 알림과 절대 시각 알림은 필요한 값이 다르므로 타입별 입력을 구분한다.
+    private void validateReminderFields(
+            ReminderType reminderType,
+            Integer remindBefore,
+            LocalDateTime remindAt
+    ) {
+        // 마감 기준 알림과 절대 시각 알림은 필요한 값이 다르므로 후보값 기준으로 먼저 검증한다.
         if (reminderType == ReminderType.RELATIVE_TO_DUE) {
             if (remindBefore == null || remindBefore < 1) {
                 throw new IllegalArgumentException("Relative reminder requires remindBefore of at least 1 minute");
@@ -95,10 +99,8 @@ public class Reminder {
             return;
         }
 
-        if (reminderType == ReminderType.ABSOLUTE_AT) {
-            if (remindAt == null) {
-                throw new IllegalArgumentException("Absolute reminder requires remindAt");
-            }
+        if (reminderType == ReminderType.ABSOLUTE_AT && remindAt == null) {
+            throw new IllegalArgumentException("Absolute reminder requires remindAt");
         }
     }
 

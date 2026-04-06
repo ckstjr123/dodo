@@ -11,10 +11,9 @@ CREATE TABLE refresh_token (
     id BIGINT NOT NULL AUTO_INCREMENT,
     member_id BIGINT NOT NULL,
     token VARCHAR(512) NOT NULL,
-    expired_at DATETIME(6) NOT NULL,1`1`
-
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    expired_at DATETIME(6) NOT NULL,
     PRIMARY KEY (id),
     KEY idx_refresh_token_token (token),
     CONSTRAINT fk_refresh_token_member

@@ -49,7 +49,7 @@ class AuthControllerWebMvcTest {
     @Test
     @DisplayName("소셜 로그인 요청이 성공하면 토큰 응답을 반환한다")
     void socialLoginReturnsTokenResponse() throws Exception {
-        when(authService.socialLogin(any())).thenReturn(new TokenResponse(
+        when(authService.login(any())).thenReturn(new TokenResponse(
                 "new-access-token",
                 "new-refresh-token",
                 "Bearer"
