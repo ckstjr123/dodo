@@ -65,7 +65,8 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
         LocalDateTime expiredAt = now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds());
-        // 기존 토큰값을 조건으로 갱신해 동시 refresh 요청이 같은 세션을 덮어쓰지 못하게 막는다.
+
+        // 기존 토큰값을 조건으로 갱신해 동시에 같은 세션을 회전하는 요청을 한 쪽만 통과시킨다.
         int updatedCount = refreshTokenRepository.rotateToken(
                 storedRefreshToken.getId(),
                 request.refreshToken(),
@@ -76,8 +77,8 @@ public class AuthService {
         if (updatedCount == 0) {
             throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
-        cleanUpRefreshTokens(memberId);
 
+        cleanUpRefreshTokens(memberId);
         return new TokenResponse(accessToken, refreshToken, "Bearer");
     }
 
@@ -108,7 +109,7 @@ public class AuthService {
                         "Unsupported social provider"
                 ));
 
-        // provider별 구현체를 선택해도 AuthService의 로그인 흐름은 하나로 유지한다.
+        // provider별 구현체를 선택해도 로그인 진입점과 후속 흐름은 하나로 유지한다.
         return oAuthClient.authenticate(authorizationCode, redirectUri);
     }
 
@@ -149,7 +150,7 @@ public class AuthService {
                     .email(email)
                     .build());
         } catch (DataIntegrityViolationException exception) {
-            // 동시 가입 경합이 발생하면 이미 저장된 회원을 다시 조회해 재사용한다.
+            // 동시 가입 경합이 나면 이미 저장된 회원을 다시 조회해 재사용한다.
             return memberRepository.findByEmail(email)
                     .orElseThrow(() -> exception);
         }
@@ -166,12 +167,7 @@ public class AuthService {
     }
 
     private void cleanUpRefreshTokens(Long memberId) {
-        // 최근에 사용된 세션 2개만 남기고, 그보다 오래된 리프레시 토큰은 제거한다.
-        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(memberId);
-        if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
-            return;
-        }
-
-        refreshTokenRepository.deleteAll(refreshTokens.subList(MAX_REFRESH_TOKEN_SESSIONS, refreshTokens.size()));
+        // 최신 세션 2개를 제외한 나머지는 DB에서 한 번에 삭제해 정리 경쟁 구간을 줄인다.
+        refreshTokenRepository.deleteOldTokensKeepingLatest(memberId, MAX_REFRESH_TOKEN_SESSIONS);
     }
 }
