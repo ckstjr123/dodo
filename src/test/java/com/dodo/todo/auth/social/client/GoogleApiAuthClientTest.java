@@ -11,13 +11,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 class GoogleApiAuthClientTest {
@@ -59,8 +59,8 @@ class GoogleApiAuthClientTest {
     }
 
     @Test
-    @DisplayName("Google token 교환이 실패하면 인증 예외를 던진다")
-    void authenticateThrowsApiExceptionWhenGoogleCallFails() {
+    @DisplayName("Google token 교환이 실패하면 RestTemplate 예외를 전파한다")
+    void authenticateThrowsRestClientExceptionWhenGoogleCallFails() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
         GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate, "client-id", "client-secret");
@@ -70,8 +70,7 @@ class GoogleApiAuthClientTest {
                 .andRespond(withUnauthorizedRequest());
 
         assertThatThrownBy(() -> client.authenticate("bad-code", "http://localhost:5173/auth/callback"))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Social authentication failed");
+                .isInstanceOf(HttpClientErrorException.Unauthorized.class);
         server.verify();
     }
 }

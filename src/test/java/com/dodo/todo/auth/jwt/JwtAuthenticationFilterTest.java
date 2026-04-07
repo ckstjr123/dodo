@@ -1,14 +1,13 @@
 package com.dodo.todo.auth.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.auth.principal.MemberPrincipal;
-import com.dodo.todo.auth.service.CustomUserDetailsService;
-import com.dodo.todo.common.exception.ApiException;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -17,10 +16,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 
 @ExtendWith(MockitoExtension.class)
 class JwtAuthenticationFilterTest {
@@ -29,7 +31,7 @@ class JwtAuthenticationFilterTest {
     private JwtTokenProvider jwtTokenProvider;
 
     @Mock
-    private CustomUserDetailsService customUserDetailsService;
+    private AuthenticationEntryPoint authenticationEntryPoint;
 
     @Mock
     private FilterChain filterChain;
@@ -40,28 +42,86 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("유효한 access 토큰이면 SecurityContext에 인증 정보를 저장한다")
+    @DisplayName("유효한 access token이면 토큰의 회원 ID로 인증 정보를 저장한다")
     void setsAuthenticationForValidToken() throws Exception {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
         MockHttpServletRequest request = requestWithBearerToken("valid-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        MemberPrincipal principal = new MemberPrincipal(3L, "user@example.com");
 
         when(jwtTokenProvider.isValidAccessToken("valid-token")).thenReturn(true);
         when(jwtTokenProvider.getMemberId("valid-token")).thenReturn(3L);
-        when(customUserDetailsService.loadUserById(3L)).thenReturn(principal);
 
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
-        assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).isEqualTo(principal);
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
+                .isInstanceOfSatisfying(MemberPrincipal.class, principal -> assertThat(principal.getId()).isEqualTo(3L));
+        verifyNoInteractions(authenticationEntryPoint);
         verify(filterChain).doFilter(request, response);
     }
 
     @Test
-    @DisplayName("잘못된 토큰이면 인증 정보를 설정하지 않는다")
-    void skipsAuthenticationForMalformedToken() throws Exception {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
+    @DisplayName("인증 토큰이 없으면 인증 정보 없이 다음 보안 흐름으로 넘긴다")
+    void proceedsWithoutAuthenticationWhenAuthorizationHeaderIsMissing() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/todos");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("Bearer 형식이 아니면 인증 정보 없이 다음 보안 흐름으로 넘긴다")
+    void proceedsWithoutAuthenticationWhenAuthorizationHeaderIsNotBearer() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
+        MockHttpServletRequest request = requestWithAuthorization("Basic token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("이미 인증 정보가 있으면 토큰을 다시 검증하지 않는다")
+    void skipsAuthenticationWhenSecurityContextAlreadyHasAuthentication() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
+        MockHttpServletRequest request = requestWithBearerToken("valid-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        Authentication authentication = authenticatedMember(1L);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(authentication);
+        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("비어 있는 Bearer token이면 인증 실패 응답으로 넘긴다")
+    void commencesAuthenticationFailureWhenBearerTokenIsBlank() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
+        MockHttpServletRequest request = requestWithAuthorization("Bearer ");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(authenticationEntryPoint).commence(any(), any(), any(BadCredentialsException.class));
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    @DisplayName("만료됐거나 유효하지 않은 token이면 인증 실패 응답으로 넘긴다")
+    void commencesAuthenticationFailureForInvalidToken() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
         MockHttpServletRequest request = requestWithBearerToken("bad-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
@@ -70,31 +130,44 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(customUserDetailsService, never()).loadUserById(anyLong());
-        verify(filterChain).doFilter(request, response);
+        verify(jwtTokenProvider, never()).getMemberId("bad-token");
+        verify(authenticationEntryPoint).commence(any(), any(), any(BadCredentialsException.class));
+        verify(filterChain, never()).doFilter(request, response);
     }
 
     @Test
-    @DisplayName("토큰의 회원이 더 이상 없으면 인증 정보를 비운다")
-    void clearsAuthenticationForStaleTokenMember() throws Exception {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, customUserDetailsService);
+    @DisplayName("token에서 회원 ID를 읽을 수 없으면 인증 실패 응답으로 넘긴다")
+    void commencesAuthenticationFailureWhenMemberIdCannotBeRead() throws Exception {
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
         MockHttpServletRequest request = requestWithBearerToken("stale-token");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         when(jwtTokenProvider.isValidAccessToken("stale-token")).thenReturn(true);
-        when(jwtTokenProvider.getMemberId("stale-token")).thenReturn(99L);
-        when(customUserDetailsService.loadUserById(99L))
-                .thenThrow(new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
+        when(jwtTokenProvider.getMemberId("stale-token")).thenThrow(new IllegalArgumentException("invalid subject"));
 
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(filterChain).doFilter(request, response);
+        verify(authenticationEntryPoint).commence(any(), any(), any(BadCredentialsException.class));
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    private Authentication authenticatedMember(Long memberId) {
+        MemberPrincipal principal = new MemberPrincipal(memberId);
+        return UsernamePasswordAuthenticationToken.authenticated(
+                principal,
+                null,
+                principal.getAuthorities()
+        );
     }
 
     private MockHttpServletRequest requestWithBearerToken(String token) {
-        MockHttpServletRequest request = new MockHttpServletRequest();
-        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+        return requestWithAuthorization("Bearer " + token);
+    }
+
+    private MockHttpServletRequest requestWithAuthorization(String authorizationHeader) {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/todos");
+        request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
         return request;
     }
 }

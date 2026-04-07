@@ -10,11 +10,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class MemberPrincipal implements UserDetails {
 
     private final Long id;
-    private final String email;
 
-    public MemberPrincipal(Long id, String email) {
+    public MemberPrincipal(Long id) {
         this.id = id;
-        this.email = email;
     }
 
     @Override
@@ -24,11 +22,11 @@ public class MemberPrincipal implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email;
+        return String.valueOf(id);
     }
 
     @Override
     public String getPassword() {
-        return null;
+        return "";
     }
 }
