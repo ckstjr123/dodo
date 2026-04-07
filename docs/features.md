@@ -27,12 +27,16 @@
 
 ## Todo
 - `todo`는 기본 작업 단위다.
+- Todo는 Todo Aggregate의 루트다.
 - Todo는 제목과 상태, 우선순위, 정렬 순서를 가진다.
+- Todo 상태는 현재 `OPEN`, `DONE`을 사용한다.
 - Todo는 간단한 설명을 위한 `memo`를 가진다.
 - Todo는 시간까지 포함하는 마감 시각 `due_at`을 가질 수 있다.
+- Todo 생성 시 체크리스트, 반복 설정, 알림, 태그 연결을 함께 요청할 수 있다.
+- Todo 생성 요청에서 `tagIds`, `checklists`, `repeat`, `reminders`는 선택 필드이며, 생략하면 해당 하위 요소를 만들지 않는다.
 
 ## Repeat
-- 반복 설정은 Todo 본체와 분리된 `todo_repeat`로 관리한다.
+- 반복 설정은 Todo Aggregate의 하위 요소이며, DB에서는 `todo_repeat` 테이블로 분리해 저장한다.
 - 반복이 없는 Todo는 `todo_repeat` 레코드가 없다.
 - 하나의 Todo는 최대 하나의 반복 규칙만 가진다.
 - 공통 필드는 `repeat_type`, `repeat_interval`이다.
@@ -45,19 +49,21 @@
 - `repeat_interval`은 1 이상이어야 한다.
 
 ## Reminder
-- 알림 설정은 Todo 본체와 분리된 `reminder`로 관리한다.
+- 알림 설정은 Todo Aggregate의 하위 요소이며, DB에서는 `reminder` 테이블로 분리해 저장한다.
 - 하나의 Todo는 여러 개의 알림을 가질 수 있다.
 - 알림 타입은 `RELATIVE_TO_DUE`, `ABSOLUTE_AT` 두 가지다.
+- 알림 타입별 필수값 검증과 Todo 등록 규칙은 알림 정책으로 분리해 적용한다.
 - `RELATIVE_TO_DUE`는 `todo.due_at` 기준의 상대 알림이다.
 - `RELATIVE_TO_DUE`는 분 단위 정수 필드 `remind_before`를 사용한다.
 - `ABSOLUTE_AT`는 특정 시각을 직접 지정하는 알림이며 `remind_at`을 사용한다.
 - `RELATIVE_TO_DUE`는 `remind_before >= 1`이어야 한다.
 - `ABSOLUTE_AT`는 `remind_at`이 필요하다.
+- 동일 Todo 안에서는 같은 `RELATIVE_TO_DUE` `remind_before` 또는 같은 `ABSOLUTE_AT` `remind_at`을 가진 알림을 중복 생성할 수 없다.
 - 알림이 필요할 때만 `reminder`를 생성하고, 해제는 삭제로 처리한다.
 - 반복 Todo에 대한 자동 알림 생성과 발송은 현재 범위에 포함하지 않는다.
 
 ## Checklist
-- `checklist`는 `todo`의 하위 요소다.
+- `checklist`는 Todo Aggregate의 하위 요소이며, DB에서는 `checklist` 테이블로 분리해 저장한다.
 - 체크리스트 항목은 완료 처리할 수 있다.
 - 체크리스트 항목은 삭제할 수 있다.
 
@@ -65,17 +71,28 @@
 - `category`는 Todo의 큰 분류다.
 - Todo는 정확히 하나의 `category`를 가진다.
 - 카테고리는 회원 소유 데이터이며 다른 회원과 공유하지 않는다.
+- Todo 생성/수정 시 선택한 `category`의 소유 회원과 현재 회원이 일치해야 한다.
 
 ## Tag
 - `tag`는 세부 분류와 검색 보조를 위한 데이터다.
 - 태그는 회원 소유 데이터이며 다른 회원과 공유하지 않는다.
 - 하나의 Todo는 여러 태그를 가질 수 있다.
 - `todo_tag`는 Todo와 Tag의 연결을 나타내는 매핑 테이블이다.
+- Todo에 태그를 연결할 때 선택한 `tag`의 소유 회원과 Todo의 소유 회원이 일치해야 한다.
+
+## Modeling Notes
+- 현재 JPA 엔티티는 package-by-domain 구조를 따른다.
+- 연관관계는 필요한 곳에만 둔다.
+- Todo Aggregate 내부의 반복 설정, 알림, 체크리스트, Todo-Tag 연결은 루트인 Todo가 소유하고 생명주기를 관리한다.
+- Todo Aggregate 내부 하위 엔티티는 Cascade와 orphanRemoval을 적용해 Todo를 통해 생성, 수정, 삭제되도록 한다.
+- `todo`는 반복 설정, 알림, 체크리스트, `todo_tag`에 대한 연관관계를 가진다.
+- `todo`와 `tag`는 직접 `ManyToMany`로 연결하지 않고 `todo_tag` 매핑 엔티티를 통해 연결한다.
+- `member`, `category`, `tag`는 Todo Aggregate 외부 참조이며 Todo에서 생명주기를 관리하지 않는다.
+- 회원 소유권 무결성은 복합 FK 대신 서비스 계층 검증으로 보장한다.
+- `created_at`, `updated_at`이 모두 필요한 엔티티는 Spring Data JPA Auditing 기반 공통 엔티티를 사용한다.
+- `created_at`만 필요한 엔티티는 각 엔티티에서 `@CreatedDate`로 관리한다.
 
 ## Planned Features
-
-### Social Login
-- 다음 단계에서 Kakao 등 다른 provider를 추가할 수 있도록 `provider` 기반 요청 구조를 유지한다.
 
 ### Notifications
 - 푸시 알림 발송 기능은 아직 구현하지 않았다.
