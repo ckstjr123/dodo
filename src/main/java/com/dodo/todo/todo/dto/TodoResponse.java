@@ -66,16 +66,14 @@ public record TodoResponse(
     public record ChecklistResponse(
             Long id,
             String content,
-            boolean completed,
-            LocalDateTime completedAt
+            boolean completed
     ) {
 
         private static ChecklistResponse from(Checklist checklist) {
             return new ChecklistResponse(
                     checklist.getId(),
                     checklist.getContent(),
-                    checklist.isCompleted(),
-                    checklist.getCompletedAt()
+                    checklist.isCompleted()
             );
         }
     }

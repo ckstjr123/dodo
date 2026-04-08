@@ -17,14 +17,7 @@ class TodoTagTest {
     @DisplayName("Todo에 태그를 추가하면 태그 매핑을 함께 보관한다")
     void addTagAndRegisterOnTodo() {
         Member member = Member.of("member@example.com");
-        Category category = Category.create(member, "업무");
-        Todo todo = Todo.builder()
-                .member(member)
-                .category(category)
-                .title("문서 정리")
-                .status(TodoStatus.OPEN)
-                .priority("MEDIUM")
-                .build();
+        Todo todo = todo(member);
         Tag tag = Tag.create(member, "중요");
 
         todo.addTag(tag);
@@ -38,17 +31,22 @@ class TodoTagTest {
     @DisplayName("TodoTag는 태그 없이 생성할 수 없다")
     void rejectTodoTagWithoutTag() {
         Member member = Member.of("member@example.com");
+        Todo todo = todo(member);
+
+        assertThatThrownBy(() -> todo.addTag(null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Tag is required");
+    }
+
+    private Todo todo(Member member) {
         Category category = Category.create(member, "업무");
-        Todo todo = Todo.builder()
+
+        return Todo.builder()
                 .member(member)
                 .category(category)
                 .title("문서 정리")
                 .status(TodoStatus.OPEN)
                 .priority("MEDIUM")
                 .build();
-
-        assertThatThrownBy(() -> todo.addTag(null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Tag is required");
     }
 }

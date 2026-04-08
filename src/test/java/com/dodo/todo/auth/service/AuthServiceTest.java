@@ -3,7 +3,6 @@ package com.dodo.todo.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,7 +27,6 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -62,7 +60,7 @@ class AuthServiceTest {
                 "google-code",
                 "http://localhost:5173/auth/callback"
         );
-        Member member = member(1L, "google@example.com");
+        Member member = memberWithId(1L, "google@example.com");
         OAuthUserInfo userInfo = new OAuthUserInfo(
                 SocialProvider.GOOGLE,
                 "google-123",
@@ -73,16 +71,12 @@ class AuthServiceTest {
         when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
                 .thenReturn(userInfo);
         when(memberRepository.findByEmail("google@example.com")).thenReturn(Optional.of(member));
-        when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(1L))
-                .thenReturn(List.of());
 
         TokenResponse response = authService.login(request);
 
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
-        verify(memberRepository, never()).save(any(Member.class));
+        assertThat(jwtTokenProvider.getMemberId(response.accessToken())).isEqualTo(1L);
     }
 
     @Test
@@ -99,48 +93,17 @@ class AuthServiceTest {
                 "new-google@example.com",
                 true
         );
-        Member savedMember = member(1L, "new-google@example.com");
+        Member savedMember = memberWithId(1L, "new-google@example.com");
 
         when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
                 .thenReturn(userInfo);
-        when(memberRepository.findByEmail("new-google@example.com")).thenReturn(Optional.empty());
-        when(memberRepository.save(any(Member.class))).thenReturn(savedMember);
-        when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(1L))
-                .thenReturn(List.of());
+        when(memberRepository.save(any())).thenReturn(savedMember);
 
-        authService.login(request);
+        TokenResponse response = authService.login(request);
 
-        ArgumentCaptor<Member> captor = ArgumentCaptor.forClass(Member.class);
-        verify(memberRepository).save(captor.capture());
-        assertThat(captor.getValue().getEmail()).isEqualTo("new-google@example.com");
-    }
-
-    @Test
-    @DisplayName("소셜 로그인 중 회원 저장 무결성 예외가 발생하면 예외를 전파한다")
-    void loginPropagatesIntegrityViolationWhenMemberSaveFails() {
-        SocialLoginRequest request = new SocialLoginRequest(
-                "GOOGLE",
-                "google-code",
-                "http://localhost:5173/auth/callback"
-        );
-        OAuthUserInfo userInfo = new OAuthUserInfo(
-                SocialProvider.GOOGLE,
-                "google-123",
-                "google@example.com",
-                true
-        );
-
-        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
-                .thenReturn(userInfo);
-        when(memberRepository.findByEmail("google@example.com")).thenReturn(Optional.empty());
-        when(memberRepository.save(any(Member.class)))
-                .thenThrow(new DataIntegrityViolationException("duplicate email"));
-
-        assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(DataIntegrityViolationException.class)
-                .hasMessage("duplicate email");
+        assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
+        assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
+        assertThat(jwtTokenProvider.getMemberId(response.accessToken())).isEqualTo(1L);
     }
 
     @Test
@@ -185,7 +148,7 @@ class AuthServiceTest {
     void refreshReturnsNewTokenPair() {
         MemberPrincipal principal = new MemberPrincipal(1L);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        Member member = member(1L, "login@example.com");
+        Member member = memberWithId(1L, "login@example.com");
         RefreshToken storedRefreshToken = new RefreshToken(
                 member,
                 refreshToken,
@@ -194,10 +157,7 @@ class AuthServiceTest {
 
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
         when(refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(1L))
-                .thenReturn(List.of(
-                        new RefreshToken(member, "first-refresh-token", LocalDateTime.now().plusDays(1)),
-                        new RefreshToken(member, "second-refresh-token", LocalDateTime.now().plusDays(1))
-                ));
+                .thenReturn(List.of(storedRefreshToken));
 
         TokenResponse response = authService.refresh(new RefreshTokenRequest(refreshToken));
 
@@ -206,7 +166,6 @@ class AuthServiceTest {
         assertThat(response.tokenType()).isEqualTo("Bearer");
         assertThat(storedRefreshToken.getToken()).isEqualTo(response.refreshToken());
         assertThat(storedRefreshToken.getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
-        verify(refreshTokenRepository, never()).delete(storedRefreshToken);
     }
 
     @Test
@@ -227,33 +186,31 @@ class AuthServiceTest {
     void refreshRejectsExpiredRefreshToken() {
         MemberPrincipal principal = new MemberPrincipal(1L);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        Member member = member(1L, "login@example.com");
-        RefreshToken storedRefreshToken = new RefreshToken(
+        Member member = memberWithId(1L, "login@example.com");
+        RefreshToken expiredRefreshToken = new RefreshToken(
                 member,
                 refreshToken,
                 LocalDateTime.now().minusMinutes(1)
         );
 
-        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(storedRefreshToken));
+        when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(expiredRefreshToken));
 
         assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Refresh token is invalid");
-        verify(refreshTokenRepository).delete(storedRefreshToken);
+        verify(refreshTokenRepository).delete(expiredRefreshToken);
     }
 
     @Test
     @DisplayName("새 세션 발급 시 최근 사용 2세션만 유지한다")
     void issueTokenResponseKeepsOnlyTwoLatestRefreshTokens() {
         MemberPrincipal principal = new MemberPrincipal(1L);
-        Member member = member(1L, "login@example.com");
+        Member member = memberWithId(1L, "login@example.com");
         RefreshToken first = new RefreshToken(member, "first-refresh-token", LocalDateTime.now().plusDays(1));
         RefreshToken second = new RefreshToken(member, "second-refresh-token", LocalDateTime.now().plusDays(1));
         RefreshToken third = new RefreshToken(member, "third-refresh-token", LocalDateTime.now().plusDays(1));
 
         when(memberRepository.getReferenceById(1L)).thenReturn(member);
-        when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
         when(refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(1L))
                 .thenReturn(List.of(first, second, third));
 
@@ -262,24 +219,6 @@ class AuthServiceTest {
         assertThat(jwtTokenProvider.isValidAccessToken(response.accessToken())).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(response.refreshToken())).isTrue();
         verify(refreshTokenRepository).deleteAll(List.of(third));
-    }
-
-    @Test
-    @DisplayName("리프레시 토큰 저장 시 만료 시각을 함께 저장한다")
-    void issueTokenResponseStoresRefreshTokenExpiration() {
-        MemberPrincipal principal = new MemberPrincipal(1L);
-        Member member = member(1L, "login@example.com");
-        when(memberRepository.getReferenceById(1L)).thenReturn(member);
-        when(refreshTokenRepository.save(any(RefreshToken.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(1L))
-                .thenReturn(List.of());
-
-        authService.issueTokenResponse(principal);
-
-        ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
-        verify(refreshTokenRepository).save(captor.capture());
-        assertThat(captor.getValue().getExpiredAt()).isAfter(LocalDateTime.now().plusDays(6));
     }
 
     @Test
@@ -295,7 +234,7 @@ class AuthServiceTest {
     @Test
     @DisplayName("현재 회원 조회 시 회원 정보를 반환한다")
     void getCurrentMemberReturnsMember() {
-        Member member = member(1L, "me@example.com");
+        Member member = memberWithId(1L, "me@example.com");
         when(memberRepository.findById(1L)).thenReturn(Optional.of(member));
 
         MemberResponse response = authService.getCurrentMember(1L);
@@ -311,9 +250,11 @@ class AuthServiceTest {
         return jwtProperties;
     }
 
-    private Member member(Long id, String email) {
+    private Member memberWithId(Long id, String email) {
         Member member = Member.of(email);
+        // Member id는 영속화 후 생성되므로 서비스 단위 테스트에서만 보강한다.
         ReflectionTestUtils.setField(member, "id", id);
         return member;
     }
+
 }

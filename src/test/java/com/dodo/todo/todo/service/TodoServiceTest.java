@@ -3,8 +3,6 @@ package com.dodo.todo.todo.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.category.domain.Category;
@@ -28,10 +26,11 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,49 +48,46 @@ class TodoServiceTest {
     @Mock
     private TodoRepository todoRepository;
 
-    private ReminderPolicy reminderPolicy;
+    @Spy
+    private ReminderPolicy reminderPolicy = new ReminderPolicy();
 
+    @InjectMocks
     private TodoService todoService;
 
-    @BeforeEach
-    void setUp() {
-        reminderPolicy = new ReminderPolicy();
-        todoService = new TodoService(
-                memberService,
-                categoryRepository,
-                tagRepository,
-                todoRepository,
-                reminderPolicy
-        );
-    }
-
     @Test
-    @DisplayName("다른 회원의 카테고리와 태그는 현재 회원 소유로 복제해 Todo를 생성한다")
-    void createTodoCopiesForeignCategoryAndTag() {
+    @DisplayName("현재 회원 소유가 아닌 카테고리로 Todo를 생성하면 예외가 발생한다")
+    void createTodoRejectsForeignCategory() {
         Member member = Member.of("member@example.com");
         Member otherMember = Member.of("other@example.com");
-        Category sourceCategory = Category.create(otherMember, "업무");
-        Tag sourceTag = Tag.create(otherMember, "중요");
-        TodoCreateRequest request = createRequest(10L, List.of(20L));
+        Category category = Category.create(otherMember, "업무");
 
         when(memberService.findById(1L)).thenReturn(member);
-        when(categoryRepository.findById(10L)).thenReturn(Optional.of(sourceCategory));
-        when(categoryRepository.save(any(Category.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(tagRepository.findById(20L)).thenReturn(Optional.of(sourceTag));
-        when(tagRepository.save(any(Tag.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
 
-        TodoResponse response = todoService.createTodo(1L, request);
-
-        assertThat(response.categoryName()).isEqualTo("업무");
-        assertThat(response.tags()).extracting(TodoResponse.TagResponse::name)
-                .containsExactly("중요");
-        verify(categoryRepository).save(any(Category.class));
-        verify(tagRepository).save(any(Tag.class));
+        assertThatThrownBy(() -> todoService.createTodo(1L, createRequest(10L, List.of())))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Category not found");
     }
 
     @Test
-    @DisplayName("현재 회원 소유 카테고리와 태그는 새로 만들지 않고 그대로 연결한다")
+    @DisplayName("현재 회원 소유가 아닌 태그로 Todo를 생성하면 예외가 발생한다")
+    void createTodoRejectsForeignTag() {
+        Member member = Member.of("member@example.com");
+        Member otherMember = Member.of("other@example.com");
+        Category category = Category.create(member, "업무");
+        Tag tag = Tag.create(otherMember, "중요");
+
+        when(memberService.findById(1L)).thenReturn(member);
+        when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
+        when(tagRepository.findById(20L)).thenReturn(Optional.of(tag));
+
+        assertThatThrownBy(() -> todoService.createTodo(1L, createRequest(10L, List.of(20L))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Tag not found");
+    }
+
+    @Test
+    @DisplayName("현재 회원 소유 카테고리와 태그를 Todo에 연결한다")
     void createTodoUsesOwnedCategoryAndTag() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "개인");
@@ -101,15 +97,13 @@ class TodoServiceTest {
         when(memberService.findById(1L)).thenReturn(member);
         when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
         when(tagRepository.findById(20L)).thenReturn(Optional.of(tag));
-        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        saveTodoAsRequested();
 
         TodoResponse response = todoService.createTodo(1L, request);
 
         assertThat(response.categoryName()).isEqualTo("개인");
         assertThat(response.tags()).extracting(TodoResponse.TagResponse::name)
                 .containsExactly("home");
-        verify(categoryRepository, never()).save(any(Category.class));
-        verify(tagRepository, never()).save(any(Tag.class));
     }
 
     @Test
@@ -134,7 +128,7 @@ class TodoServiceTest {
 
         when(memberService.findById(1L)).thenReturn(member);
         when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
-        when(todoRepository.save(any(Todo.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        saveTodoAsRequested();
 
         TodoResponse response = todoService.createTodo(1L, request);
 
@@ -156,6 +150,21 @@ class TodoServiceTest {
         assertThatThrownBy(() -> todoService.createTodo(1L, createRequest(99L, List.of())))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Category not found");
+    }
+
+    @Test
+    @DisplayName("태그 ID가 실제 엔티티를 찾지 못하면 예외가 발생한다")
+    void createTodoRejectsMissingTag() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "업무");
+
+        when(memberService.findById(1L)).thenReturn(member);
+        when(categoryRepository.findById(10L)).thenReturn(Optional.of(category));
+        when(tagRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> todoService.createTodo(1L, createRequest(10L, List.of(99L))))
+                .isInstanceOf(ApiException.class)
+                .hasMessage("Tag not found");
     }
 
     @Test
@@ -228,5 +237,10 @@ class TodoServiceTest {
                 .status(TodoStatus.OPEN)
                 .priority("HIGH")
                 .build();
+    }
+
+    private void saveTodoAsRequested() {
+        when(todoRepository.save(any(Todo.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0, Todo.class));
     }
 }
