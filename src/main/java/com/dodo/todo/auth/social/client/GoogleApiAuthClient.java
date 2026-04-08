@@ -4,7 +4,7 @@ import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -16,10 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
-@Slf4j
 @Component
 public class GoogleApiAuthClient implements OAuthClient {
 
@@ -31,6 +29,7 @@ public class GoogleApiAuthClient implements OAuthClient {
     private final String clientId;
     private final String clientSecret;
 
+    @Autowired
     public GoogleApiAuthClient(
             RestTemplateBuilder restTemplateBuilder,
             @Value("${spring.security.oauth2.client.registration.google.client-id}") String clientId,
@@ -52,27 +51,18 @@ public class GoogleApiAuthClient implements OAuthClient {
 
     @Override
     public OAuthUserInfo authenticate(String authorizationCode, String redirectUri) {
-        try {
-            GoogleTokenResponse tokenResponse = exchangeAuthorizationCode(authorizationCode, redirectUri);
-            validateTokenResponse(tokenResponse);
+        GoogleTokenResponse tokenResponse = exchangeAuthorizationCode(authorizationCode, redirectUri);
+        validateTokenResponse(tokenResponse);
 
-            GoogleUserInfoResponse userInfoResponse = fetchUserInfo(tokenResponse.accessToken());
-            validateUserInfoResponse(userInfoResponse);
+        GoogleUserInfoResponse userInfoResponse = fetchUserInfo(tokenResponse.accessToken());
+        validateUserInfoResponse(userInfoResponse);
 
-            return new OAuthUserInfo(
-                    SocialProvider.GOOGLE,
-                    userInfoResponse.sub(),
-                    userInfoResponse.email(),
-                    Boolean.TRUE.equals(userInfoResponse.emailVerified())
-            );
-        } catch (RestClientException exception) {
-            log.warn("Google social authentication failed", exception);
-            throw new ApiException(
-                    "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
-                    "Social authentication failed"
-            );
-        }
+        return new OAuthUserInfo(
+                SocialProvider.GOOGLE,
+                userInfoResponse.sub(),
+                userInfoResponse.email(),
+                Boolean.TRUE.equals(userInfoResponse.emailVerified())
+        );
     }
 
     private GoogleTokenResponse exchangeAuthorizationCode(String authorizationCode, String redirectUri) {

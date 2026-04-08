@@ -9,7 +9,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.dodo.todo.auth.dto.MemberResponse;
 import com.dodo.todo.auth.dto.TokenResponse;
-import com.dodo.todo.auth.jwt.JwtAuthenticationFilter;
 import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.auth.service.AuthService;
@@ -37,9 +36,6 @@ class AuthControllerWebMvcTest {
 
     @MockitoBean
     private AuthService authService;
-
-    @MockitoBean
-    private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @AfterEach
     void clearContext() {
@@ -130,7 +126,7 @@ class AuthControllerWebMvcTest {
     @DisplayName("현재 회원 조회는 로그인한 회원 정보를 반환한다")
     void meReturnsCurrentMember() throws Exception {
         when(authService.getCurrentMember(5L)).thenReturn(new MemberResponse(5L, "me@example.com"));
-        MemberPrincipal principal = new MemberPrincipal(5L, "me@example.com");
+        MemberPrincipal principal = new MemberPrincipal(5L);
         SecurityContextHolder.getContext().setAuthentication(
                 org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
                         principal,
