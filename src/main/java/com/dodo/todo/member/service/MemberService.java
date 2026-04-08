@@ -1,30 +1,26 @@
-package com.dodo.todo.auth.service;
+package com.dodo.todo.member.service;
 
-import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.domain.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-public class CustomUserDetailsService {
+public class MemberService {
 
     private final MemberRepository memberRepository;
 
-    public MemberPrincipal loadUserById(Long memberId) {
-        Member member = memberRepository.findById(memberId)
+    /**
+     * 회원 조회
+     * ID로 회원을 조회하고 없으면 404 예외를 발생시킴.
+     */
+    @Transactional(readOnly = true)
+    public Member findById(Long memberId) {
+        return memberRepository.findById(memberId)
                 .orElseThrow(() -> new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
-
-        return toPrincipal(member);
-    }
-
-    private MemberPrincipal toPrincipal(Member member) {
-        return new MemberPrincipal(
-                member.getId(),
-                member.getEmail()
-        );
     }
 }

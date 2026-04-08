@@ -8,7 +8,7 @@ import com.dodo.todo.auth.dto.SocialLoginRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
 import com.dodo.todo.auth.jwt.JwtTokenProvider;
 import com.dodo.todo.auth.principal.MemberPrincipal;
-import com.dodo.todo.auth.social.client.OAuthClient;
+import com.dodo.todo.auth.social.client.OAuthClients;
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
@@ -17,7 +17,6 @@ import com.dodo.todo.member.domain.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,12 +30,11 @@ public class AuthService {
     private final MemberRepository memberRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
-    private final CustomUserDetailsService customUserDetailsService;
-    private final List<OAuthClient> oAuthClients;
+    private final OAuthClients oAuthClients;
 
     public TokenResponse login(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
-        OAuthUserInfo userInfo = authenticate(provider, request.authorizationCode(), request.redirectUri());
+        OAuthUserInfo userInfo = oAuthClients.authenticate(provider, request.authorizationCode(), request.redirectUri());
         validateOAuthUserInfo(userInfo);
 
         return completeLogin(userInfo);
@@ -57,8 +55,8 @@ public class AuthService {
             throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
 
-        Long memberId = jwtTokenProvider.getMemberId(storedRefreshToken.getToken());
-        MemberPrincipal principal = customUserDetailsService.loadUserById(memberId);
+        Long memberId = storedRefreshToken.getMemberId();
+        MemberPrincipal principal = new MemberPrincipal(memberId);
 
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
@@ -81,9 +79,15 @@ public class AuthService {
 
     @Transactional
     public TokenResponse issueTokenResponse(MemberPrincipal principal) {
+        Member member = memberRepository.getReferenceById(principal.getId());
+        return issueTokenResponse(member);
+    }
+
+    private TokenResponse issueTokenResponse(Member member) {
+        MemberPrincipal principal = new MemberPrincipal(member.getId());
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        createRefreshToken(principal.getId(), refreshToken);
+        createRefreshToken(member, refreshToken);
 
         return new TokenResponse(accessToken, refreshToken, "Bearer");
     }
@@ -91,21 +95,7 @@ public class AuthService {
     @Transactional
     protected TokenResponse completeLogin(OAuthUserInfo userInfo) {
         Member member = findOrCreateMember(userInfo.email());
-        return issueTokenResponse(new MemberPrincipal(member.getId(), member.getEmail()));
-    }
-
-    private OAuthUserInfo authenticate(SocialProvider provider, String authorizationCode, String redirectUri) {
-        OAuthClient oAuthClient = oAuthClients.stream()
-                .filter(client -> client.supports(provider))
-                .findFirst()
-                .orElseThrow(() -> new ApiException(
-                        "UNSUPPORTED_SOCIAL_PROVIDER",
-                        HttpStatus.BAD_REQUEST,
-                        "Unsupported social provider"
-                ));
-
-        // provider별 구현체를 선택해도 로그인 진입점과 후속 흐름은 하나로 유지한다.
-        return oAuthClient.authenticate(authorizationCode, redirectUri);
+        return issueTokenResponse(member);
     }
 
     private void validateOAuthUserInfo(OAuthUserInfo userInfo) {
@@ -136,34 +126,22 @@ public class AuthService {
 
     private Member findOrCreateMember(String email) {
         return memberRepository.findByEmail(email)
-                .orElseGet(() -> createMember(email));
+                .orElseGet(() -> memberRepository.save(Member.of(email)));
     }
 
-    private Member createMember(String email) {
-        try {
-            return memberRepository.save(Member.builder()
-                    .email(email)
-                    .build());
-        } catch (DataIntegrityViolationException exception) {
-            // 동시 가입 경합이 나면 이미 저장된 회원을 다시 조회해 재사용한다.
-            return memberRepository.findByEmail(email)
-                    .orElseThrow(() -> exception);
-        }
-    }
-
-    private void createRefreshToken(Long memberId, String token) {
-        RefreshToken refreshToken = RefreshToken.builder()
-                .memberId(memberId)
-                .token(token)
-                .expiredAt(LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds()))
-                .build();
+    private void createRefreshToken(Member member, String token) {
+        RefreshToken refreshToken = new RefreshToken(
+                member,
+                token,
+                LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
+        );
         refreshTokenRepository.save(refreshToken);
-        cleanUpRefreshTokens(memberId);
+        cleanUpRefreshTokens(member.getId());
     }
 
     private void cleanUpRefreshTokens(Long memberId) {
-        // 최근 사용 기준으로 최신 2세션만 남긴다.
-        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMemberIdOrderByUpdatedAtDescIdDesc(memberId);
+        // 최근 사용 기준으로 최대 2개의 세션만 남긴다.
+        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(memberId);
         if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
             return;
         }
