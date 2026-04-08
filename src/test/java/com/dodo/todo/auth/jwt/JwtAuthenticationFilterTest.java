@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.auth.principal.MemberPrincipal;
@@ -56,7 +55,6 @@ class JwtAuthenticationFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
                 .isInstanceOfSatisfying(MemberPrincipal.class, principal -> assertThat(principal.getId()).isEqualTo(3L));
-        verifyNoInteractions(authenticationEntryPoint);
         verify(filterChain).doFilter(request, response);
     }
 
@@ -70,7 +68,6 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
         verify(filterChain).doFilter(request, response);
     }
 
@@ -84,7 +81,6 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
         verify(filterChain).doFilter(request, response);
     }
 
@@ -100,7 +96,6 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isSameAs(authentication);
-        verifyNoInteractions(jwtTokenProvider, authenticationEntryPoint);
         verify(filterChain).doFilter(request, response);
     }
 
@@ -130,7 +125,6 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
-        verify(jwtTokenProvider, never()).getMemberId("bad-token");
         verify(authenticationEntryPoint).commence(any(), any(), any(BadCredentialsException.class));
         verify(filterChain, never()).doFilter(request, response);
     }

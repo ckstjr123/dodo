@@ -11,7 +11,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -36,9 +35,6 @@ public class Checklist extends BaseEntity {
     @Column(name = "is_completed", nullable = false)
     private boolean completed;
 
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
-
     private Checklist(Todo todo, String content) {
         validateTodo(todo);
         validateContent(content);
@@ -54,12 +50,12 @@ public class Checklist extends BaseEntity {
         return todo.getId();
     }
 
-    public void complete(LocalDateTime completedAt) {
-        if (completedAt == null) {
-            throw new IllegalArgumentException("Completed at is required");
-        }
+    /**
+     * 체크리스트 완료 처리
+     * 완료 여부만 갱신하고 별도의 완료 시각은 저장하지 않는다.
+     */
+    public void complete() {
         this.completed = true;
-        this.completedAt = completedAt;
     }
 
     private void validateTodo(Todo todo) {

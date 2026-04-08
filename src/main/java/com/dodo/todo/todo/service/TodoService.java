@@ -39,8 +39,8 @@ public class TodoService {
     @Transactional
     public TodoResponse createTodo(Long memberId, TodoCreateRequest request) {
         Member member = memberService.findById(memberId);
-        Category category = resolveCategory(member, request.categoryId());
-        List<Tag> tags = resolveTags(member, request.tagIds());
+        Category category = findCategory(member, request.categoryId());
+        List<Tag> tags = getTags(member, request.tagIds());
 
         Todo todo = Todo.builder()
                 .member(member)
@@ -88,40 +88,39 @@ public class TodoService {
         return TodoResponse.from(todo);
     }
 
-    private Category resolveCategory(Member member, Long categoryId) {
+    private Category findCategory(Member member, Long categoryId) {
         Category category = categoryRepository.findById(categoryId)
                 .orElseThrow(() -> new ApiException("CATEGORY_NOT_FOUND", HttpStatus.NOT_FOUND, "Category not found"));
 
-        if (category.isOwnedBy(member)) {
-            return category;
+        if (!category.isOwnedBy(member)) {
+            throw new ApiException("CATEGORY_NOT_FOUND", HttpStatus.NOT_FOUND, "Category not found");
         }
 
-        return categoryRepository.save(Category.create(member, category.getName()));
+        return category;
     }
 
-    private List<Tag> resolveTags(Member member, List<Long> tagIds) {
+    private List<Tag> getTags(Member member, List<Long> tagIds) {
         if (tagIds == null || tagIds.isEmpty()) {
             return List.of();
         }
 
         List<Tag> tags = new ArrayList<>();
-        Set<Long> uniqueTagIds = new LinkedHashSet<>(tagIds);
-        for (Long tagId : uniqueTagIds) {
-            tags.add(resolveTag(member, tagId));
+        for (Long tagId : new LinkedHashSet<>(tagIds)) {
+            tags.add(findTag(member, tagId));
         }
 
         return tags;
     }
 
-    private Tag resolveTag(Member member, Long tagId) {
+    private Tag findTag(Member member, Long tagId) {
         Tag tag = tagRepository.findById(tagId)
                 .orElseThrow(() -> new ApiException("TAG_NOT_FOUND", HttpStatus.NOT_FOUND, "Tag not found"));
 
-        if (tag.isOwnedBy(member)) {
-            return tag;
+        if (!tag.isOwnedBy(member)) {
+            throw new ApiException("TAG_NOT_FOUND", HttpStatus.NOT_FOUND, "Tag not found");
         }
 
-        return tagRepository.save(Tag.create(member, tag.getName()));
+        return tag;
     }
 
     private void validateTodoOwner(Todo todo, Member member) {

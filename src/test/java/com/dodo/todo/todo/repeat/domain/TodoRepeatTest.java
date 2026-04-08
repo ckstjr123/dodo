@@ -18,6 +18,7 @@ class TodoRepeatTest {
     @DisplayName("일간 반복은 반복 간격만으로 생성된다")
     void createDailyRepeat() {
         Todo todo = todo();
+
         TodoRepeat todoRepeat = TodoRepeat.daily(todo, 3);
 
         assertThat(todoRepeat.getTodo()).isSameAs(todo);

@@ -2,7 +2,6 @@ package com.dodo.todo.auth.social.client;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
@@ -43,7 +42,6 @@ class OAuthClientsTest {
         );
 
         assertThat(response).isEqualTo(userInfo);
-        verify(oAuthClient).authenticate("google-code", "http://localhost:5173/auth/callback");
     }
 
     @Test

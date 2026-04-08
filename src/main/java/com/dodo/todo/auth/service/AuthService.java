@@ -140,7 +140,7 @@ public class AuthService {
     }
 
     private void cleanUpRefreshTokens(Long memberId) {
-        // 최근 사용 기준으로 최신 2세션만 남긴다.
+        // 최근 사용 기준으로 최대 2개의 세션만 남긴다.
         List<RefreshToken> refreshTokens = refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(memberId);
         if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
             return;

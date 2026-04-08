@@ -4,6 +4,7 @@ import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -28,6 +29,7 @@ public class GoogleApiAuthClient implements OAuthClient {
     private final String clientId;
     private final String clientSecret;
 
+    @Autowired
     public GoogleApiAuthClient(
             RestTemplateBuilder restTemplateBuilder,
             @Value("${spring.security.oauth2.client.registration.google.client-id}") String clientId,

@@ -17,7 +17,7 @@
   - Pinia
 
 ## Source of Truth
-- Database schema: `src/main/resources/sql/schema.sql`
+- Database schema migrations: `src/main/resources/db/migration`
 - Functional specification: `docs/features.md`
 
 ## Architecture
@@ -140,8 +140,105 @@ public interface UserRepository extends JpaRepository<User, Long> {
 - Tests must include the essential happy paths and only the important edge cases and failure cases.
 - Use mocking only for external APIs, infrastructure boundaries, or cases where isolation is otherwise difficult or unnecessary complexity would be introduced.
 - Avoid using reflection in tests unless there is no reasonable alternative.
-- Add `@DisplayName` to every test method and write the display names in Korean.
-- If tests fail, review the cause first and proceed with refactoring only when it is necessary and justified.
+- If tests fail, review the cause first and suggest production code refactoring only when it is necessary and justified.  
+
+
+- Fundamentally, tests should verify the results (state changes or return values) rather than the implementation details.  
+  **Bad:**
+  ```java
+  @Test
+  @DisplayName("할인 정책을 적용한다")
+  void calculateTotal_AppliesDiscountPolicy() { 
+      // given
+      Order order = new Order(10000);
+      when(discountPolicy.getDiscountRate(order)).thenReturn(10);
+
+      // when
+      orderService.calculateTotal(order);
+
+      // then
+      verify(discountPolicy, times(1)).getDiscountRate(order);
+  }  
+  ```
+  **Better:**
+  ```java
+    @ExtendWith(MockitoExtension.class)
+    class OrderServiceTest {
+
+    @Mock
+    private DiscountPolicy discountPolicy;
+
+    @InjectMocks
+    private OrderService orderService;
+
+    @Test
+    @DisplayName("주문에 할인 정책이 적용되면 할인된 금액을 반환한다")
+    void calculateTotal_ReturnsDiscountedPrice() {
+        // given
+        Order order = new Order(10000);
+        when(discountPolicy.getDiscountRate(order)).thenReturn(10);
+
+        // when
+        int totalAmount = orderService.calculateTotal(order);
+
+        // then
+        assertThat(totalAmount).isEqualTo(9000); 
+    }
+  } 
+  ```
+- Write Descriptive and Meaningful Phrases.  
+  **Bad:**
+  ```java
+  class JobApplicantTest {
+
+    private JobApplicant jobApplicant;
+    
+    @BeforeEach
+    void setUp() {
+        String name = "haru";
+        JobApplicantStatus status = JobApplicantStatus.IN_PROGRESS;
+        jobApplicant = JobApplicant.create(name, status);
+    }
+    
+    @Test
+    @DisplayName("지원자를 최종 합격시킨다")
+    void passApplicant() {
+        // when
+        jobApplicant.pass();
+
+        // then
+        assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.PASS);
+    }
+  }
+  ```
+  **Better:**
+  ```java
+  class JobApplicantTest {
+
+    @Test
+    @DisplayName("지원자를 최종 합격시킨다")
+    void passApplicant() {
+        // given
+        JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.IN_PROGRESS);
+
+        // when
+        jobApplicant.pass();
+
+        // then
+        assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.PASS);
+    }
+  }
+
+  class JobApplicantFixture {
+      public static JobApplicant create(JobApplicantStatus status) {
+          return JobApplicant.create("haru", status);
+      }
+
+      public static JobApplicant create(JobApplicantStatus status, String name) {
+        return JobApplicant.create(name, status);
+      }
+  }
+  ```
 
 ## Commit Convention
 - Commit messages must follow the Conventional Commits format.
