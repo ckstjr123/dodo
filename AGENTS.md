@@ -24,7 +24,9 @@
 - The project targets a monolithic architecture.
 - Use package-by-domain structure.
 - Must organize code primarily by domain and let each domain grow around its controller, service, repository, and domain model.
-- Keep dependencies one-directional where practical: controller -> service -> repository/domain.
+- Separate persistence interfaces into a dedicated `repository` package instead of placing them under `domain`.
+- Keep dependencies one-directional where practical: controller -> service -> domain/repository.
+  - Treat `domain` as the package for entities, value objects, enums, and domain behavior.
 
 ## Code Style
 
@@ -129,6 +131,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 ```
 
 ## Implementation Guidance
+- Follow the CQS (Command Query Separation) principle so commands change state without returning query data, and queries do not mutate state.
 - Before modifying application code, first explain the planned changes and wait for user approval.
 - When implementing or changing a feature, complete the implementation and tests in the same work.
 - Do not treat implementation as complete until the tests pass.
@@ -147,44 +150,48 @@ public interface UserRepository extends JpaRepository<User, Long> {
   **Bad:**
   ```java
   @Test
-  @DisplayName("할인 정책을 적용한다")
-  void calculateTotal_AppliesDiscountPolicy() { 
-      // given
-      Order order = new Order(10000);
-      when(discountPolicy.getDiscountRate(order)).thenReturn(10);
-
-      // when
-      orderService.calculateTotal(order);
-
-      // then
-      verify(discountPolicy, times(1)).getDiscountRate(order);
+  void getProductTest() {
+      Long productId = 100L;
+      Product product = new Product(productId, "맥북 프로", 3000000);
+      when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+      
+      productService.getProduct(productId);
+      
+      verify(productRepository, times(1)).findById(productId);
   }  
   ```
   **Better:**
   ```java
-    @ExtendWith(MockitoExtension.class)
-    class OrderServiceTest {
+  @ExtendWith(MockitoExtension.class)
+  class ProductServiceTest {
 
-    @Mock
-    private DiscountPolicy discountPolicy;
+      @Mock
+      private ProductRepository productRepository;
+  
+      @Spy
+      private DiscountPolicy discountPolicy;
 
-    @InjectMocks
-    private OrderService orderService;
+      @InjectMocks
+      private ProductService productService;
 
-    @Test
-    @DisplayName("주문에 할인 정책이 적용되면 할인된 금액을 반환한다")
-    void calculateTotal_ReturnsDiscountedPrice() {
-        // given
-        Order order = new Order(10000);
-        when(discountPolicy.getDiscountRate(order)).thenReturn(10);
+      @Test
+      @DisplayName("등록된 상품을 조회한다")
+      void getProduct_ReturnsProductDetails() {
+          // given
+          Long productId = 100L;
+          Product product = new Product(productId, "MacBook Pro", 3000000);
+          when(productRepository.findById(productId)).thenReturn(Optional.of(product));
 
-        // when
-        int totalAmount = orderService.calculateTotal(order);
+          // when
+          ProductResponse response = productService.getProduct(productId);
 
-        // then
-        assertThat(totalAmount).isEqualTo(9000); 
-    }
-  } 
+          // then
+          assertThat(response).isNotNull();
+          assertThat(response.getId()).isEqualTo(product.getId());
+          assertThat(response.getName()).isEqualTo(product.getName());
+          assertThat(response.getPrice()).isEqualTo(product.getPrice());
+      }
+  }
   ```
 - Write Descriptive and Meaningful Phrases.  
   **Bad:**
@@ -201,13 +208,15 @@ public interface UserRepository extends JpaRepository<User, Long> {
     }
     
     @Test
-    @DisplayName("지원자를 최종 합격시킨다")
-    void passApplicant() {
-        // when
+    void successTest() {
         jobApplicant.pass();
-
-        // then
         assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.PASS);
+    }
+  
+    @Test
+    void failTest() {
+        jobApplicant.fail();
+        assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.FAIL);
     }
   }
   ```
@@ -217,7 +226,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Test
     @DisplayName("지원자를 최종 합격시킨다")
-    void passApplicant() {
+    void should_pass_applicant() {
         // given
         JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.IN_PROGRESS);
 
@@ -227,16 +236,41 @@ public interface UserRepository extends JpaRepository<User, Long> {
         // then
         assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.PASS);
     }
+
+    @Test
+    @DisplayName("지원서를 불합격시킨다")
+    void should_fail_applicant() {
+        // given
+        JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.IN_PROGRESS);
+
+        // when
+        jobApplicant.fail();
+
+        // then
+        assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.FAIL);
+    }
+
+    @Test
+    @DisplayName("지원서를 불합격 상태일 때 보관할 수 있다")
+    void store_failed_applicant() {
+        // given
+        JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.FAIL);
+
+        // when
+        jobApplicant.putStorage();
+
+        // then
+        assertThat(jobApplicant.isStorage()).isTrue();
+    }
   }
 
   class JobApplicantFixture {
-      public static JobApplicant create(JobApplicantStatus status) {
-          return JobApplicant.create("haru", status);
-      }
-
-      public static JobApplicant create(JobApplicantStatus status, String name) {
+    public static JobApplicant create(JobApplicantStatus status) {
+        return create(status, "haru");
+    }
+    public static JobApplicant create(JobApplicantStatus status, String name) {
         return JobApplicant.create(name, status);
-      }
+    }
   }
   ```
 

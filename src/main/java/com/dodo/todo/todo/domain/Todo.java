@@ -3,13 +3,10 @@ package com.dodo.todo.todo.domain;
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.common.entity.BaseEntity;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.tag.domain.Tag;
-import com.dodo.todo.todo.checklist.domain.Checklist;
-import com.dodo.todo.todo.reminder.domain.Reminder;
-import com.dodo.todo.todo.repeat.domain.TodoRepeat;
-import com.dodo.todo.todo.tag.domain.TodoTag;
-import jakarta.persistence.CascadeType;
+import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.RecurrenceRuleConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,15 +17,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
-import jakarta.persistence.OneToOne;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -53,6 +49,15 @@ public class Todo extends BaseEntity {
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_todo_id")
+    private Todo mainTodo;
+
+    @BatchSize(size = 100)
+    @OrderBy("sortOrder ASC, id ASC")
+    @OneToMany(mappedBy = "mainTodo")
+    private List<Todo> subTodos = new ArrayList<>();
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -63,55 +68,54 @@ public class Todo extends BaseEntity {
     @Column(nullable = false, length = 20)
     private TodoStatus status;
 
-    @Column(nullable = false, length = 20)
-    private String priority;
-
     @Column(name = "sort_order", nullable = false)
     private int sortOrder;
 
     @Column(name = "due_at")
     private LocalDateTime dueAt;
 
-    @OneToOne(mappedBy = "todo", cascade = CascadeType.ALL, orphanRemoval = true)
-    private TodoRepeat repeat;
+    @Column(name = "scheduled_date")
+    private LocalDate scheduledDate;
 
-    @BatchSize(size = 100)
-    @OrderBy("id ASC")
-    @OneToMany(mappedBy = "todo", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Reminder> reminders = new ArrayList<>();
+    @Column(name = "scheduled_time")
+    private LocalTime scheduledTime;
 
-    @BatchSize(size = 100)
-    @OrderBy("id ASC")
-    @OneToMany(mappedBy = "todo", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Checklist> checklists = new ArrayList<>();
-
-    @BatchSize(size = 100)
-    @OrderBy("id ASC")
-    @OneToMany(mappedBy = "todo", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<TodoTag> todoTags = new ArrayList<>();
+    @Convert(converter = RecurrenceRuleConverter.class)
+    @Column(name = "recurrence_rule", columnDefinition = "json")
+    private RecurrenceRule recurrenceRule;
 
     @Builder
     private Todo(
             Member member,
             Category category,
+            Todo mainTodo,
             String title,
             String memo,
             TodoStatus status,
-            String priority,
             Integer sortOrder,
-            LocalDateTime dueAt
+            LocalDateTime dueAt,
+            LocalDate scheduledDate,
+            LocalTime scheduledTime,
+            RecurrenceRule recurrenceRule
     ) {
         validateMember(member);
         validateCategory(category);
         validateStatus(status);
+        if (mainTodo != null && !mainTodo.isOwnedBy(member)) {
+            throw new IllegalArgumentException("Main todo must belong to the same member");
+        }
+        validateRecurrenceSchedule(recurrenceRule, scheduledDate);
         this.member = member;
         this.category = category;
+        this.mainTodo = mainTodo;
         this.title = title;
         this.memo = memo;
         this.status = status;
-        this.priority = priority;
         this.sortOrder = sortOrder == null ? 0 : sortOrder;
         this.dueAt = dueAt;
+        this.scheduledDate = scheduledDate;
+        this.scheduledTime = scheduledTime;
+        this.recurrenceRule = recurrenceRule;
     }
 
     public Long getMemberId() {
@@ -122,15 +126,14 @@ public class Todo extends BaseEntity {
         return category.getId();
     }
 
-    public boolean isOwnedBy(Long memberId) {
-        return member != null && member.getId() != null && member.getId().equals(memberId);
+    public Long getMainTodoId() {
+        return mainTodo == null ? null : mainTodo.getId();
     }
 
     public boolean isOwnedBy(Member member) {
         if (member == null || this.member == null) {
             return false;
         }
-
         if (this.member == member) {
             return true;
         }
@@ -138,100 +141,45 @@ public class Todo extends BaseEntity {
         return this.member.getId() != null && this.member.getId().equals(member.getId());
     }
 
-    public List<TodoTag> getTodoTags() {
-        return Collections.unmodifiableList(todoTags);
+    public boolean hasMainTodo() {
+        return mainTodo != null;
     }
 
-    public List<Reminder> getReminders() {
-        return Collections.unmodifiableList(reminders);
+    public List<Todo> getSubTodos() {
+        return Collections.unmodifiableList(subTodos);
     }
 
-    public List<Checklist> getChecklists() {
-        return Collections.unmodifiableList(checklists);
-    }
-
-    public void updateSchedule(String memo, LocalDateTime dueAt) {
-        this.memo = memo;
-        this.dueAt = dueAt;
+    public boolean isRecurringTodo() {
+        return recurrenceRule != null;
     }
 
     /**
-     * Todo 태그 연결
-     * Todo Aggregate 내부 매핑 엔티티로 태그를 연결함.
+     * 완료 처리한다.
+     * 반복 Todo는 다음 반복일이 있으면 scheduledDate를 이동하고, 없으면 DONE으로 변경한다.
+     * mainTodo를 완료하면 subTodo도 함께 DONE으로 변경한다.
      */
-    public void addTag(Tag tag) {
-        TodoTag todoTag = TodoTag.create(this, tag);
-        todoTags.add(todoTag);
-    }
-
-    /**
-     * 체크리스트 추가
-     * Todo 하위 체크리스트 항목을 생성하고 루트 컬렉션에 등록함.
-     */
-    public Checklist addChecklist(String content) {
-        Checklist checklist = Checklist.create(this, content);
-        checklists.add(checklist);
-        return checklist;
-    }
-
-    /**
-     * 일간 반복 설정
-     * Todo에 기존 반복 설정을 대체하는 일간 반복 규칙을 등록함.
-     */
-    public TodoRepeat setDailyRepeat(int repeatInterval) {
-        this.repeat = TodoRepeat.daily(this, repeatInterval);
-        return repeat;
-    }
-
-    /**
-     * 주간 반복 설정
-     * Todo에 기존 반복 설정을 대체하는 주간 반복 규칙을 등록함.
-     */
-    public TodoRepeat setWeeklyRepeat(int repeatInterval, Set<DayOfWeek> daysOfWeek) {
-        this.repeat = TodoRepeat.weekly(this, repeatInterval, daysOfWeek);
-        return repeat;
-    }
-
-    /**
-     * 마감 기준 알림 추가
-     * Todo의 마감 시각을 기준으로 상대 알림 규칙을 등록함.
-     */
-    public Reminder addRelativeReminder(int remindBefore) {
-        if (dueAt == null) {
-            throw new IllegalArgumentException("Due date is required for relative reminder");
+    public void complete() {
+        if (isRecurringTodo()) {
+            LocalDate nextScheduledDate = recurrenceRule.nextDate(scheduledDate);
+            if (nextScheduledDate == null) {
+                status = TodoStatus.DONE;
+            } else {
+                scheduledDate = nextScheduledDate;
+            }
+        } else {
+            status = TodoStatus.DONE;
         }
 
-        if (hasRelativeReminder(remindBefore)) {
-            throw new IllegalArgumentException("Duplicate relative reminder");
-        }
-
-        Reminder reminder = Reminder.relativeToDue(this, remindBefore);
-        reminders.add(reminder);
-        return reminder;
+        subTodos.forEach(subTodo -> subTodo.status = TodoStatus.DONE);
     }
 
     /**
-     * 절대 시각 알림 추가
-     * Todo에 특정 시각 알림 규칙을 등록함.
+     * 완료를 취소한다.
+     * mainTodo를 복구하면 subTodo도 함께 TODO로 복구한다.
      */
-    public Reminder addAbsoluteReminder(LocalDateTime remindAt) {
-        if (hasAbsoluteReminder(remindAt)) {
-            throw new IllegalArgumentException("Duplicate absolute reminder");
-        }
-
-        Reminder reminder = Reminder.absoluteAt(this, remindAt);
-        reminders.add(reminder);
-        return reminder;
-    }
-
-    public boolean hasRelativeReminder(int remindBefore) {
-        return reminders.stream()
-                .anyMatch(reminder -> reminder.isRelativeToDue(remindBefore));
-    }
-
-    public boolean hasAbsoluteReminder(LocalDateTime remindAt) {
-        return reminders.stream()
-                .anyMatch(reminder -> reminder.isAbsoluteAt(remindAt));
+    public void undo() {
+        status = TodoStatus.TODO;
+        subTodos.forEach(subTodo -> subTodo.status = TodoStatus.TODO);
     }
 
     private void validateMember(Member member) {
@@ -249,6 +197,12 @@ public class Todo extends BaseEntity {
     private void validateStatus(TodoStatus status) {
         if (status == null) {
             throw new IllegalArgumentException("Todo status is required");
+        }
+    }
+
+    private void validateRecurrenceSchedule(RecurrenceRule recurrenceRule, LocalDate scheduledDate) {
+        if (recurrenceRule != null && scheduledDate == null) {
+            throw new IllegalArgumentException("Scheduled date is required for recurring todo");
         }
     }
 }
