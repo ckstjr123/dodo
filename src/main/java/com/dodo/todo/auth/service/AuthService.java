@@ -1,7 +1,7 @@
 package com.dodo.todo.auth.service;
 
 import com.dodo.todo.auth.domain.RefreshToken;
-import com.dodo.todo.auth.domain.RefreshTokenRepository;
+import com.dodo.todo.auth.repository.RefreshTokenRepository;
 import com.dodo.todo.auth.dto.MemberResponse;
 import com.dodo.todo.auth.dto.RefreshTokenRequest;
 import com.dodo.todo.auth.dto.SocialLoginRequest;
@@ -13,7 +13,7 @@ import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.member.domain.MemberRepository;
+import com.dodo.todo.member.repository.MemberRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
