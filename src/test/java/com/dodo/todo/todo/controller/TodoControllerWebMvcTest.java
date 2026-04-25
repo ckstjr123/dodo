@@ -75,7 +75,7 @@ class TodoControllerWebMvcTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(requestBody))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.parentTodoId").value(todoId));
+                .andExpect(jsonPath("$.todoId").value(todoId));
     }
 
     @Test
@@ -108,7 +108,7 @@ class TodoControllerWebMvcTest {
 
         mockMvc.perform(get("/api/v1/todos"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.todos[0].parentTodoId").value(todoId))
+                .andExpect(jsonPath("$.todos[0].todoId").value(todoId))
                 .andExpect(jsonPath("$.todos[0].title").value("보고서 작성"))
                 .andExpect(jsonPath("$.todos[0].subTodos[0].title").value("초안 작성"));
     }
@@ -121,9 +121,9 @@ class TodoControllerWebMvcTest {
         when(todoService.getTodo(memberId, todoId)).thenReturn(response(todoId, "보고서 작성"));
         authenticate(memberId);
 
-        mockMvc.perform(get("/api/v1/todos/{parentTodoId}", todoId))
+        mockMvc.perform(get("/api/v1/todos/{todoId}", todoId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.parentTodoId").value(todoId))
+                .andExpect(jsonPath("$.todoId").value(todoId))
                 .andExpect(jsonPath("$.title").value("보고서 작성"))
                 .andExpect(jsonPath("$.subTodos[0].title").value("초안 작성"));
     }
@@ -136,7 +136,7 @@ class TodoControllerWebMvcTest {
         doNothing().when(todoService).completeTodo(memberId, todoId);
         authenticate(memberId);
 
-        mockMvc.perform(patch("/api/v1/todos/{parentTodoId}/complete", todoId))
+        mockMvc.perform(patch("/api/v1/todos/{todoId}/complete", todoId))
                 .andExpect(status().isNoContent());
     }
 
