@@ -2,11 +2,9 @@ package com.dodo.todo.todo.domain;
 
 import com.dodo.todo.member.domain.Member;
 import jakarta.persistence.Column;
-import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityListeners;
 import jakarta.persistence.FetchType;
-import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -31,9 +29,8 @@ public class TodoHistory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "todo_id", nullable = false, foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
-    private Todo todo;
+    @Column(name = "todo_id", nullable = false)
+    private Long todoId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "member_id", nullable = false)
@@ -49,9 +46,12 @@ public class TodoHistory {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    private TodoHistory(Todo todo, Member member, LocalDateTime completedAt) {
-        if (todo == null) {
+    private TodoHistory(Long todoId, String title, Member member, LocalDateTime completedAt) {
+        if (todoId == null) {
             throw new IllegalArgumentException("Todo is required");
+        }
+        if (title == null || title.isBlank()) {
+            throw new IllegalArgumentException("Todo title is required");
         }
         if (member == null) {
             throw new IllegalArgumentException("Member is required");
@@ -60,19 +60,19 @@ public class TodoHistory {
             throw new IllegalArgumentException("Completed at is required");
         }
 
-        this.todo = todo;
+        this.todoId = todoId;
         this.member = member;
-        this.title = todo.getTitle();
+        this.title = title;
         this.completedAt = completedAt;
     }
 
-    /** 현재 todo title을 사용해 완료 이력을 생성한다. */
+    /** ?꾩옱 todo title???ъ슜???꾨즺 ?대젰???앹꽦?쒕떎. */
     public static TodoHistory create(Todo todo, LocalDateTime completedAt) {
-        return new TodoHistory(todo, todo.getMember(), completedAt);
-    }
+        if (todo == null) {
+            throw new IllegalArgumentException("Todo is required");
+        }
 
-    public Long getTodoId() {
-        return todo.getId();
+        return new TodoHistory(todo.getId(), todo.getTitle(), todo.getMember(), completedAt);
     }
 
     public Long getMemberId() {

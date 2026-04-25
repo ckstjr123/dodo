@@ -93,6 +93,23 @@ class TodoTest {
     }
 
     @Test
+    @DisplayName("이미 완료된 Todo를 다시 완료하면 예외가 발생한다")
+    void rejectCompleteDoneTodo() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("done")
+                .status(TodoStatus.DONE)
+                .build();
+
+        assertThatThrownBy(todo::complete)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Todo already completed");
+    }
+
+    @Test
     @DisplayName("반복 Todo를 완료하면 다음 스케줄로 이동한다")
     void completeRecurringTodo() {
         Member member = Member.of("member@example.com");
@@ -153,12 +170,16 @@ class TodoTest {
                 .scheduledDate(LocalDate.of(2026, 4, 7))
                 .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null))
                 .build();
-        ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodo));
+        setSubTodos(mainTodo, subTodo);
 
         mainTodo.complete();
 
         assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.DONE);
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.DONE);
+    }
+
+    private static void setSubTodos(Todo mainTodo, Todo... subTodos) {
+        ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodos));
     }
 
     @Test
@@ -178,6 +199,42 @@ class TodoTest {
         todo.undo();
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
+    }
+
+    @Test
+    @DisplayName("완료된 메인 Todo를 완료 취소하면 하위 작업도 함께 TODO로 복구된다")
+    void undoDoneMainTodoRestoresSubTodos() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo mainTodo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("main")
+                .status(TodoStatus.DONE)
+                .build();
+        Todo subTodo = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(mainTodo)
+                .title("sub")
+                .status(TodoStatus.DONE)
+                .build();
+        setSubTodos(mainTodo, subTodo);
+
+        mainTodo.undo();
+
+        assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+    }
+
+    @Test
+    @DisplayName("이미 TODO인 Todo를 완료 취소하면 예외가 발생한다")
+    void rejectUndoNotCompletedTodo() {
+        Todo todo = todo(Member.of("member@example.com"));
+
+        assertThatThrownBy(todo::undo)
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("Todo is not completed");
     }
 
     private Todo todo(Member member) {

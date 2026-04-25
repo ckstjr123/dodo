@@ -28,7 +28,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.SliceImpl;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -61,14 +63,14 @@ class TodoHistoryControllerWebMvcTest {
         setId(history, 1L);
 
         when(todoHistoryRepository.findHistories(eq(memberId), any(), any(), any(), any(Pageable.class)))
-                .thenReturn(List.of(history));
+                .thenReturn(new SliceImpl<>(List.of(history), PageRequest.of(0, 30), false));
         authenticate(memberId);
 
         mockMvc.perform(get("/api/v1/todos/histories")
                         .param("size", "30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.histories[0].historyId").value(1L))
-                .andExpect(jsonPath("$.histories[0].todoId").value(7L))
+                .andExpect(jsonPath("$.histories[0].parentTodoId").value(7L))
                 .andExpect(jsonPath("$.histories[0].title").value("보고서 작성"))
                 .andExpect(jsonPath("$.hasNext").value(false));
     }
