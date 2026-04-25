@@ -39,20 +39,20 @@ public class TodoController implements TodoApiDocs {
     }
 
     @Override
-    @GetMapping("/{parentTodoId}")
+    @GetMapping("/{todoId}")
     public TodoResponse getTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
         return todoService.getTodo(memberId, todoId);
     }
 
     @Override
-    @PatchMapping("/{parentTodoId}/complete")
+    @PatchMapping("/{todoId}/complete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void completeTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
         todoService.completeTodo(memberId, todoId);
     }
 
     @Override
-    @PatchMapping("/{parentTodoId}/undo")
+    @PatchMapping("/{todoId}/undo")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void undoTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
         todoService.undoTodo(memberId, todoId);

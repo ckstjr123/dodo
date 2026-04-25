@@ -70,7 +70,7 @@ class TodoHistoryControllerWebMvcTest {
                         .param("size", "30"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.histories[0].historyId").value(1L))
-                .andExpect(jsonPath("$.histories[0].parentTodoId").value(7L))
+                .andExpect(jsonPath("$.histories[0].todoId").value(7L))
                 .andExpect(jsonPath("$.histories[0].title").value("보고서 작성"))
                 .andExpect(jsonPath("$.hasNext").value(false));
     }
