@@ -200,7 +200,7 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("완료된 반복 Todo를 완료 취소하면 TODO 상태로 복구된다")
+    @DisplayName("완전 완료된 반복 Todo를 완료 취소하면 TODO 상태로 복구된다")
     void undoRecurringDoneTodo() {
         Long memberId = 1L;
         Long todoId = 7L;
