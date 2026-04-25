@@ -101,6 +101,23 @@ class TodoTest {
     }
 
     @Test
+    @DisplayName("반복 Todo는 scheduledDate 없이 생성할 수 없다")
+    void rejectRecurringTodoWithoutScheduledDate() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+
+        assertThatThrownBy(() -> Todo.builder()
+                .member(member)
+                .category(category)
+                .title("recurring")
+                .status(TodoStatus.TODO)
+                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null))
+                .build())
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage("Scheduled date is required for recurring todo");
+    }
+
+    @Test
     @DisplayName("반복 Todo를 완료하면 다음 스케줄로 이동한다")
     void completeRecurringTodo() {
         Member member = Member.of("member@example.com");

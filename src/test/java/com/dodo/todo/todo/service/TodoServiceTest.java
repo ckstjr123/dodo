@@ -92,35 +92,6 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("반복 Todo는 scheduledDate가 필요하다")
-    void saveRecurringTodoRequiresScheduledDate() {
-        Long memberId = 1L;
-        Long categoryId = 10L;
-        Member member = createMember(memberId);
-        Category category = createCategory(member, "work");
-        RecurrenceRule rule = new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null);
-
-        when(memberService.findById(memberId)).thenReturn(member);
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
-
-        TodoCreateRequest request = new TodoCreateRequest(
-                categoryId,
-                null,
-                "prepare",
-                "memo",
-                1,
-                LocalDateTime.of(2026, 4, 7, 18, 0),
-                null,
-                LocalTime.of(14, 0),
-                createRecurrenceRuleRequest(rule)
-        );
-
-        assertThatThrownBy(() -> todoService.saveTodo(memberId, request))
-                .isInstanceOf(ApiException.class)
-                .hasMessage("Scheduled date is required for recurring todo");
-    }
-
-    @Test
     @DisplayName("깊이가 2를 넘는 하위 작업은 생성할 수 없다")
     void saveTodoRejectsDepthLimitExceeded() {
         Long memberId = 1L;
