@@ -142,7 +142,7 @@ class AuthControllerWebMvcTest {
 
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(memberId))
+                .andExpect(jsonPath("$.memberId").value(memberId))
                 .andExpect(jsonPath("$.email").value(email));
     }
 

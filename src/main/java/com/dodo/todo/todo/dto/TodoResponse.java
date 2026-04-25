@@ -9,8 +9,8 @@ import java.time.LocalTime;
 import java.util.List;
 
 public record TodoResponse(
-        Long id,
-        Long mainTodoId,
+        Long todoId,
+        Long parentTodoId,
         Long categoryId,
         String categoryName,
         String title,

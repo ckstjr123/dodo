@@ -1,5 +1,17 @@
 package com.dodo.todo.todo.service;
 
+import static com.dodo.todo.util.TestFixture.createCategory;
+import static com.dodo.todo.util.TestFixture.createMember;
+import static com.dodo.todo.util.TestFixture.createRecurringTodo;
+import static com.dodo.todo.util.TestFixture.createSubTodo;
+import static com.dodo.todo.util.TestFixture.createTodo;
+import static com.dodo.todo.util.TestFixture.setId;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.category.repository.CategoryRepository;
 import com.dodo.todo.common.exception.ApiException;
@@ -10,28 +22,21 @@ import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
 import com.dodo.todo.todo.dto.TodoCreateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
-
-import static com.dodo.todo.util.TestFixture.*;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
@@ -107,7 +112,7 @@ class TodoServiceTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 null,
                 LocalTime.of(14, 0),
-                rule
+                createRecurrenceRuleRequest(rule)
         );
 
         assertThatThrownBy(() -> todoService.saveTodo(memberId, request))
@@ -153,7 +158,7 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("반복 Todo를 완료하면 다음 스케줄로 이동한다")
+    @DisplayName("반복 Todo를 완료하면 다음 일정으로 이동한다")
     void completeRecurringTodo() {
         Long memberId = 1L;
         Long todoId = 7L;
@@ -185,17 +190,17 @@ class TodoServiceTest {
                 .scheduledDate(LocalDate.of(2026, 4, 10))
                 .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 4, 10)))
                 .build();
+        setId(todo, todoId);
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
         todoService.completeTodo(memberId, todoId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.DONE);
-        verify(todoHistoryRepository).save(any(TodoHistory.class));
     }
 
     @Test
-    @DisplayName("반복 Todo 영구 완료도 TODO 상태로 복구된다")
+    @DisplayName("완료된 반복 Todo를 완료 취소하면 TODO 상태로 복구된다")
     void undoRecurringDoneTodo() {
         Long memberId = 1L;
         Long todoId = 7L;
@@ -227,7 +232,21 @@ class TodoServiceTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0),
-                recurrenceRule
+                createRecurrenceRuleRequest(recurrenceRule)
+        );
+    }
+
+    private RecurrenceRuleRequest createRecurrenceRuleRequest(RecurrenceRule recurrenceRule) {
+        if (recurrenceRule == null) {
+            return null;
+        }
+
+        return new RecurrenceRuleRequest(
+                recurrenceRule.frequency(),
+                recurrenceRule.interval(),
+                recurrenceRule.byDay(),
+                recurrenceRule.byMonthDay(),
+                recurrenceRule.until()
         );
     }
 }

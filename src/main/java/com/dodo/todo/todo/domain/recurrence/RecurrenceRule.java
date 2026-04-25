@@ -47,7 +47,7 @@ public record RecurrenceRule(
             throw new IllegalArgumentException("Current date is required");
         }
         if (frequency == Frequency.MONTHLY && byMonthDay != null) {
-            LocalDate nextMonth = currentDate.plusMonths(interval);
+            LocalDate nextMonth = currentDate.withDayOfMonth(1).plusMonths(interval);
             LocalDate nextDate = nextMonth.withDayOfMonth(Math.min(byMonthDay, nextMonth.lengthOfMonth()));
             return isAfterUntil(nextDate) ? null : nextDate;
         }
@@ -145,4 +145,5 @@ public record RecurrenceRule(
             }
         }
     }
+
 }

@@ -1,6 +1,7 @@
 package com.dodo.todo.todo.dto;
 
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -12,7 +13,7 @@ public record TodoCreateRequest(
         @NotNull
         Long categoryId,
 
-        Long mainTodoId,
+        Long parentTodoId,
 
         @NotBlank
         @Size(max = 200)
@@ -29,6 +30,16 @@ public record TodoCreateRequest(
 
         LocalTime scheduledTime,
 
-        RecurrenceRule recurrenceRule
+        @Valid
+        RecurrenceRuleRequest recurrenceRule
 ) {
+
+    public RecurrenceRule getRecurrenceRule() {
+        if (recurrenceRule == null) {
+            return null;
+        }
+
+        return recurrenceRule.toRecurrenceRule();
+    }
+
 }

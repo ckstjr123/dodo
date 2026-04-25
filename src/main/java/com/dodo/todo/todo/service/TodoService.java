@@ -35,8 +35,9 @@ public class TodoService {
     public Long saveTodo(Long memberId, TodoCreateRequest request) {
         Member member = memberService.findById(memberId);
         Category category = findCategory(member, request.categoryId());
-        Todo mainTodo = findMainTodo(memberId, request.mainTodoId());
-        validateRecurrenceSchedule(request.recurrenceRule(), request.scheduledDate());
+        Todo mainTodo = findMainTodo(memberId, request.parentTodoId());
+        RecurrenceRule recurrenceRule = request.getRecurrenceRule();
+        validateRecurrenceSchedule(recurrenceRule, request.scheduledDate());
 
         Todo todo = Todo.builder()
                 .member(member)
@@ -49,7 +50,7 @@ public class TodoService {
                 .dueAt(request.dueAt())
                 .scheduledDate(request.scheduledDate())
                 .scheduledTime(request.scheduledTime())
-                .recurrenceRule(request.recurrenceRule())
+                .recurrenceRule(recurrenceRule)
                 .build();
 
         return todoRepository.save(todo).getId();

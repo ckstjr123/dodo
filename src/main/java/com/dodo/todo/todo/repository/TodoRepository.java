@@ -12,10 +12,10 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
     @Query("""
             select todo
             from Todo todo
-            where todo.id = :todoId
+            where todo.id = :parentTodoId
               and todo.member.id = :memberId
             """)
-    Optional<Todo> findByIdAndMemberId(@Param("todoId") Long todoId, @Param("memberId") Long memberId);
+    Optional<Todo> findByIdAndMemberId(@Param("parentTodoId") Long todoId, @Param("memberId") Long memberId);
 
     /**
      * Todo 목록과 바로 아래 하위 작업을 함께 조회한다.
@@ -44,9 +44,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
             join fetch todo.category
             left join fetch todo.subTodos subTodo
             left join fetch subTodo.category
-            where todo.id = :todoId
+            where todo.id = :parentTodoId
               and todo.member.id = :memberId
             """)
-    Optional<Todo> findWithSubTodos(@Param("todoId") Long todoId,
+    Optional<Todo> findWithSubTodos(@Param("parentTodoId") Long todoId,
                                     @Param("memberId") Long memberId);
 }

@@ -10,13 +10,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Slice;
 import org.springframework.http.HttpStatus;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-
 @RestController
 @RequestMapping("/api/v1/todos/histories")
 @RequiredArgsConstructor
@@ -33,45 +32,41 @@ public class TodoHistoryController implements TodoHistoryApiDocs {
      */
     @Override
     @GetMapping
-    @Transactional(readOnly = true)
     public TodoHistoryListResponse getHistories(
             @LoginMember Long memberId,
             @RequestParam(required = false) Long todoId,
             @RequestParam(required = false) LocalDateTime cursorCompletedAt,
             @RequestParam(required = false) Long cursorId,
-            @RequestParam(required = false) Integer size
+            @RequestParam(defaultValue = "30") Integer size
     ) {
-        int pageSize = size == null || size < 1 ? DEFAULT_HISTORY_SIZE : Math.min(size, MAX_HISTORY_SIZE);
-        List<TodoHistory> histories = todoHistoryRepository.findHistories(
+        if ((cursorCompletedAt == null) != (cursorId == null)) {
+            throw new ApiException("VALIDATION_ERROR", HttpStatus.BAD_REQUEST, "Cursor completedAt and cursorId must be provided together");
+        }
+
+        int pageSize = size < 1 ? DEFAULT_HISTORY_SIZE : Math.min(size, MAX_HISTORY_SIZE);
+        Slice<TodoHistory> historySlice = todoHistoryRepository.findHistories(
                 memberId,
                 todoId,
                 cursorCompletedAt,
                 cursorId,
-                PageRequest.of(0, pageSize + 1)
+                PageRequest.of(0, pageSize)
         );
+        List<TodoHistory> histories = historySlice.getContent();
+        List<TodoHistoryResponse> historyResponses = histories.stream()
+                .map(TodoHistoryResponse::from)
+                .toList();
 
-        boolean hasNext = histories.size() > pageSize;
-        if (hasNext) {
-            histories = histories.subList(0, pageSize);
+        if (!historySlice.hasNext() || histories.isEmpty()) {
+            return new TodoHistoryListResponse(historyResponses, null, null, false);
         }
 
-        if (histories.stream().anyMatch(history -> history.getTodo() == null)) {
-            throw new ApiException("TODO_HISTORY_TODO_NOT_FOUND", HttpStatus.NOT_FOUND, "Todo history cannot be viewed because todo was deleted");
-        }
-
-        LocalDateTime nextCursorCompletedAt = null;
-        Long nextCursorId = null;
-        if (hasNext && !histories.isEmpty()) {
-            TodoHistory lastHistory = histories.get(histories.size() - 1);
-            nextCursorCompletedAt = lastHistory.getCompletedAt();
-            nextCursorId = lastHistory.getId();
-        }
-
+        TodoHistory lastHistory = histories.get(histories.size() - 1);
         return new TodoHistoryListResponse(
-                histories.stream().map(TodoHistoryResponse::from).toList(),
-                nextCursorCompletedAt,
-                nextCursorId,
-                hasNext
+                historyResponses,
+                lastHistory.getCompletedAt(),
+                lastHistory.getId(),
+                true
         );
     }
+
 }

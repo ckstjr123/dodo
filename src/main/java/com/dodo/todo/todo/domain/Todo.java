@@ -159,6 +159,10 @@ public class Todo extends BaseEntity {
      * mainTodo를 완료하면 subTodo도 함께 DONE으로 변경한다.
      */
     public void complete() {
+        if (status == TodoStatus.DONE) {
+            throw new IllegalStateException("Todo already completed");
+        }
+
         if (isRecurringTodo()) {
             LocalDate nextScheduledDate = recurrenceRule.nextDate(scheduledDate);
             if (nextScheduledDate == null) {
@@ -178,6 +182,10 @@ public class Todo extends BaseEntity {
      * mainTodo를 복구하면 subTodo도 함께 TODO로 복구한다.
      */
     public void undo() {
+        if (status != TodoStatus.DONE) {
+            throw new IllegalStateException("Todo is not completed");
+        }
+
         status = TodoStatus.TODO;
         subTodos.forEach(subTodo -> subTodo.status = TodoStatus.TODO);
     }
