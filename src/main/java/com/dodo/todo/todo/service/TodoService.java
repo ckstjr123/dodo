@@ -14,7 +14,6 @@ import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -37,7 +36,6 @@ public class TodoService {
         Category category = findCategory(member, request.categoryId());
         Todo mainTodo = findMainTodo(memberId, request.parentTodoId());
         RecurrenceRule recurrenceRule = request.getRecurrenceRule();
-        validateRecurrenceSchedule(recurrenceRule, request.scheduledDate());
 
         Todo todo = Todo.builder()
                 .member(member)
@@ -113,11 +111,5 @@ public class TodoService {
     private Todo findTodoWithSubTodos(Long memberId, Long todoId) {
         return todoRepository.findWithSubTodos(todoId, memberId)
                 .orElseThrow(() -> new ApiException("TODO_NOT_FOUND", HttpStatus.NOT_FOUND, "Todo not found"));
-    }
-
-    private void validateRecurrenceSchedule(RecurrenceRule recurrenceRule, LocalDate scheduledDate) {
-        if (recurrenceRule != null && scheduledDate == null) {
-            throw new ApiException("SCHEDULED_DATE_REQUIRED", HttpStatus.BAD_REQUEST, "Scheduled date is required for recurring todo");
-        }
     }
 }
