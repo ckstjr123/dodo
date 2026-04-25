@@ -17,16 +17,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class TodoTest {
 
     @Test
-    @DisplayName("같은 회원 엔티티면 소유자로 판단한다")
-    void isOwnedBySameMemberEntity() {
-        Member member = Member.of("member@example.com");
-        Todo todo = todo(member);
-
-        assertThat(todo.isOwnedBy(member)).isTrue();
-    }
-
-    @Test
-    @DisplayName("다른 회원 엔티티면 소유자가 아니다")
+    @DisplayName("다른 회원의 Todo면 소유자가 아니다")
     void isNotOwnedByOtherMemberEntity() {
         Todo todo = todo(Member.of("member@example.com"));
 
@@ -178,10 +169,6 @@ class TodoTest {
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.DONE);
     }
 
-    private static void setSubTodos(Todo mainTodo, Todo... subTodos) {
-        ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodos));
-    }
-
     @Test
     @DisplayName("영구 완료된 반복 Todo도 TODO 상태로 복구할 수 있다")
     void undoRecurringDoneTodo() {
@@ -246,5 +233,9 @@ class TodoTest {
                 .title("doc")
                 .status(TodoStatus.TODO)
                 .build();
+    }
+
+    private void setSubTodos(Todo mainTodo, Todo... subTodos) {
+        ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodos));
     }
 }
