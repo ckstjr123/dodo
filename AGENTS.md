@@ -53,7 +53,6 @@ public int applyCoupon(int totalPrice, Coupon coupon) {
 
 ### Naming & Readability
 - Use variable, method, and type names that follow the conventions of the language and ecosystem in use, stay consistent and describe the actual behavior being performed.
-- If a new naming pattern could become a broader convention, align with the user before spreading it further.
 - Write code so that the core flow reads naturally from top to bottom with minimal cognitive overhead.
 
 ```java
@@ -89,10 +88,6 @@ Payment payment = PaymentFactory.create(card, amount, currency);
 
 ```java
 public void processOrder(Order order) {
-    if (order == null || !order.isReady()) {
-        return;
-    }
-    
     if (order.getPayment() == null) {
         throw new ApiException(NOT_FOUND_PAYMENT);
     }
@@ -113,28 +108,25 @@ public List<String> getActiveMemberEmails(List<Member> members) {
 }
 ```
 
-### simplicity
-- Choose the simplest approach possible. For example, follow the defaults and built-in solutions recommended by the framework or library.
-
-**Bad:**
-```java
-public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<Member> findByIdAndDeletedFalse(Long id); // unnecessary query method for a simple primary key lookup
-    List<User> findAllByOrderByIdAsc(); // use findAll()
-}
-```
-**Good:**
-```java
-public interface UserRepository extends JpaRepository<User, Long> {
-    Optional<User> findByEmail(String email); // custom
-}
+### SQL
+- Write SQL and JPQL keywords such as `SELECT`, `FROM`, `WHERE`, `JOIN`, `ORDER BY` in uppercase.
+```sql
+SELECT COUNT(m), m.city 
+FROM Member m 
+GROUP BY m.city 
+HAVING COUNT(m) > 5
 ```
 
 ## Implementation Guidance
 - Follow the CQS (Command Query Separation) principle so commands change state without returning query data, and queries do not mutate state.
-- Before modifying application code, first explain the planned changes and wait for user approval.
+- Before coding application code, explain possible implementation options with their trade-offs and must wait for user approval.
+- Use the defaults and built-in solutions recommended by the framework or library.
+    ```java
+    public interface UserRepository extends JpaRepository<User, Long> {
+        Optional<User> findByIdAndDeletedFalse(Long id); // unnecessary query method for a simple primary key lookup
+    }
+    ```
 - When implementing or changing a feature, complete the implementation and tests in the same work.
-- Do not treat implementation as complete until the tests pass.
 - Before finalizing code changes, check for obvious mistakes, regressions, or missing updates.
 
 ## Testing
@@ -143,16 +135,14 @@ public interface UserRepository extends JpaRepository<User, Long> {
 - Tests must include the essential happy paths and only the important edge cases and failure cases.
 - Use mocking only for external APIs, infrastructure boundaries, or cases where isolation is otherwise difficult or unnecessary complexity would be introduced.
 - Avoid using reflection in tests unless there is no reasonable alternative.
-- If tests fail, review the cause first and suggest production code refactoring only when it is necessary and justified.  
-
-
+- If tests fail, review the cause first and suggest production code refactoring only when it is necessary and justified. 
 - Fundamentally, tests should verify the results (state changes or return values) rather than the implementation details.  
   **Bad:**
   ```java
   @Test
   void getProductTest() {
       Long productId = 100L;
-      Product product = new Product(productId, "맥북 프로", 3000000);
+      Product product = new Product(productId, "MacBook Pro", 3000000);
       when(productRepository.findById(productId)).thenReturn(Optional.of(product));
       
       productService.getProduct(productId);
@@ -186,7 +176,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
           ProductResponse response = productService.getProduct(productId);
 
           // then
-          assertThat(response).isNotNull();
           assertThat(response.getId()).isEqualTo(product.getId());
           assertThat(response.getName()).isEqualTo(product.getName());
           assertThat(response.getPrice()).isEqualTo(product.getPrice());
