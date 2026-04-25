@@ -10,9 +10,9 @@ import org.springframework.data.repository.query.Param;
 public interface TodoRepository extends JpaRepository<Todo, Long> {
 
     @Query("""
-            select todo
-            from Todo todo
-            where todo.id = :parentTodoId
+            SELECT todo
+            FROM Todo todo
+            WHERE todo.id = :parentTodoId
               and todo.member.id = :memberId
             """)
     Optional<Todo> findByIdAndMemberId(@Param("parentTodoId") Long todoId, @Param("memberId") Long memberId);
@@ -22,15 +22,15 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
      * 현재 Todo 계층은 하위 작업 1단계까지만 허용하므로 깊이는 최대 2다.
      */
     @Query("""
-            select todo
-            from Todo todo
-            join fetch todo.category
-            left join fetch todo.subTodos subTodo
-            left join fetch subTodo.category
-            where todo.member.id = :memberId
+            SELECT todo
+            FROM Todo todo
+            JOIN FETCH todo.category
+            LEFT JOIN FETCH todo.subTodos subTodo
+            LEFT JOIN FETCH subTodo.category
+            WHERE todo.member.id = :memberId
               and todo.mainTodo is null
               and todo.status = com.dodo.todo.todo.domain.TodoStatus.TODO
-            order by todo.sortOrder asc, todo.id desc
+            ORDER BY todo.sortOrder asc, todo.id desc
             """)
     List<Todo> findWithSubTodos(@Param("memberId") Long memberId);
 
@@ -39,12 +39,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
      * 현재 Todo 계층은 하위 작업 1단계까지만 허용하므로 깊이는 최대 2다.
      */
     @Query("""
-            select todo
-            from Todo todo
-            join fetch todo.category
-            left join fetch todo.subTodos subTodo
-            left join fetch subTodo.category
-            where todo.id = :parentTodoId
+            SELECT todo
+            FROM Todo todo
+            JOIN FETCH todo.category
+            LEFT JOIN FETCH todo.subTodos subTodo
+            LEFT JOIN FETCH subTodo.category
+            WHERE todo.id = :parentTodoId
               and todo.member.id = :memberId
             """)
     Optional<Todo> findWithSubTodos(@Param("parentTodoId") Long todoId,
