@@ -2,7 +2,7 @@ package com.dodo.todo.member.service;
 
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.member.domain.MemberRepository;
+import com.dodo.todo.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

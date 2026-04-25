@@ -1,5 +1,6 @@
-package com.dodo.todo.member.domain;
+package com.dodo.todo.member.repository;
 
+import com.dodo.todo.member.domain.Member;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 

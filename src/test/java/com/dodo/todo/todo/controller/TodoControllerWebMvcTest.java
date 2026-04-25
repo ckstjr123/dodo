@@ -2,8 +2,10 @@ package com.dodo.todo.todo.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -17,7 +19,9 @@ import com.dodo.todo.todo.dto.TodoCreateRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.service.TodoService;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -49,84 +53,95 @@ class TodoControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("Todo 생성 요청은 현재 회원 정보를 기준으로 Todo를 생성한다")
+    @DisplayName("Todo 생성 응답으로 todoId를 반환한다")
     void createTodoReturnsCreatedResponse() throws Exception {
-        TodoResponse response = response(7L, "할 일 만들기");
-        when(todoService.createTodo(eq(5L), any(TodoCreateRequest.class))).thenReturn(response);
-        authenticate(5L);
+        Long memberId = 5L;
+        Long todoId = 7L;
+        String requestBody = """
+                {
+                  "categoryId": 10,
+                  "title": "보고서 작성",
+                  "memo": "초안부터 작성",
+                  "sortOrder": 1,
+                  "dueAt": "2026-04-07T18:00:00",
+                  "scheduledDate": "2026-04-07",
+                  "scheduledTime": "14:00:00"
+                }
+                """;
+        when(todoService.saveTodo(eq(memberId), any(TodoCreateRequest.class))).thenReturn(todoId);
+        authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "categoryId": 10,
-                                  "title": "할 일 만들기",
-                                  "memo": "초안 작성",
-                                  "priority": "HIGH",
-                                  "sortOrder": 1,
-                                  "dueAt": "2026-04-07T18:00:00",
-                                  "tagIds": [20],
-                                  "checklists": [
-                                    { "content": "초안 점검" }
-                                  ],
-                                  "reminders": [
-                                    { "reminderType": "ABSOLUTE_AT", "remindAt": "2026-04-07T09:00:00" }
-                                  ]
-                                }
-                                """))
+                        .content(requestBody))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(7))
-                .andExpect(jsonPath("$.categoryId").value(10))
-                .andExpect(jsonPath("$.title").value("할 일 만들기"))
-                .andExpect(jsonPath("$.tags[0].name").value("중요"));
+                .andExpect(jsonPath("$.parentTodoId").value(todoId));
     }
 
     @Test
-    @DisplayName("Todo 생성 요청에서 필수 값이 비어 있으면 검증 오류를 반환한다")
+    @DisplayName("Todo 생성 요청 검증 실패 시 오류를 반환한다")
     void createTodoReturnsValidationError() throws Exception {
-        authenticate(5L);
+        Long memberId = 5L;
+        String requestBody = """
+                {
+                  "categoryId": 10,
+                  "title": ""
+                }
+                """;
+        authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {
-                                  "categoryId": 10,
-                                  "title": "",
-                                  "priority": ""
-                                }
-                                """))
+                        .content(requestBody))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.title").exists())
-                .andExpect(jsonPath("$.validationErrors.priority").exists());
+                .andExpect(jsonPath("$.validationErrors.title").exists());
     }
 
     @Test
-    @DisplayName("Todo 목록 조회는 현재 회원의 Todo 목록을 반환한다")
+    @DisplayName("Todo 목록 조회 응답으로 목록을 반환한다")
     void getTodosReturnsTodoList() throws Exception {
-        when(todoService.getTodos(5L)).thenReturn(new TodoListResponse(List.of(response(7L, "할 일 만들기"))));
-        authenticate(5L);
+        Long memberId = 5L;
+        Long todoId = 7L;
+        when(todoService.getTodos(memberId)).thenReturn(new TodoListResponse(List.of(response(todoId, "보고서 작성"))));
+        authenticate(memberId);
 
         mockMvc.perform(get("/api/v1/todos"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.todos[0].id").value(7))
-                .andExpect(jsonPath("$.todos[0].title").value("할 일 만들기"));
+                .andExpect(jsonPath("$.todos[0].parentTodoId").value(todoId))
+                .andExpect(jsonPath("$.todos[0].title").value("보고서 작성"))
+                .andExpect(jsonPath("$.todos[0].subTodos[0].title").value("초안 작성"));
     }
 
     @Test
-    @DisplayName("Todo 단건 조회는 Todo 응답을 반환한다")
+    @DisplayName("Todo 상세 조회 응답으로 Todo를 반환한다")
     void getTodoReturnsTodo() throws Exception {
-        when(todoService.getTodo(5L, 7L)).thenReturn(response(7L, "할 일 만들기"));
-        authenticate(5L);
+        Long memberId = 5L;
+        Long todoId = 7L;
+        when(todoService.getTodo(memberId, todoId)).thenReturn(response(todoId, "보고서 작성"));
+        authenticate(memberId);
 
-        mockMvc.perform(get("/api/v1/todos/7"))
+        mockMvc.perform(get("/api/v1/todos/{parentTodoId}", todoId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(7))
-                .andExpect(jsonPath("$.title").value("할 일 만들기"));
+                .andExpect(jsonPath("$.parentTodoId").value(todoId))
+                .andExpect(jsonPath("$.title").value("보고서 작성"))
+                .andExpect(jsonPath("$.subTodos[0].title").value("초안 작성"));
     }
 
     @Test
-    @DisplayName("Todo 목록 조회는 인증 정보가 없으면 401을 반환한다")
+    @DisplayName("Todo 완료 요청은 204를 반환한다")
+    void completeTodoReturnsNoContent() throws Exception {
+        Long memberId = 5L;
+        Long todoId = 7L;
+        doNothing().when(todoService).completeTodo(memberId, todoId);
+        authenticate(memberId);
+
+        mockMvc.perform(patch("/api/v1/todos/{parentTodoId}/complete", todoId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("인증 없이 Todo 목록을 조회하면 401을 반환한다")
     void getTodosReturnsUnauthorizedWithoutAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/todos"))
                 .andExpect(status().isUnauthorized())
@@ -144,21 +159,35 @@ class TodoControllerWebMvcTest {
         );
     }
 
-    private TodoResponse response(Long id, String title) {
+    private TodoResponse response(Long todoId, String title) {
         return new TodoResponse(
-                id,
+                todoId,
+                null,
                 10L,
                 "업무",
                 title,
-                "초안 작성",
-                TodoStatus.OPEN,
-                "HIGH",
+                "초안부터 작성",
+                TodoStatus.TODO,
                 1,
                 LocalDateTime.of(2026, 4, 7, 18, 0),
-                List.of(new TodoResponse.TagResponse(20L, "중요")),
-                List.of(new TodoResponse.ChecklistResponse(30L, "초안 점검", false)),
+                LocalDate.of(2026, 4, 7),
+                LocalTime.of(14, 0),
                 null,
-                List.of()
+                List.of(new TodoResponse(
+                        30L,
+                        todoId,
+                        10L,
+                        "업무",
+                        "초안 작성",
+                        "초안 문장 정리",
+                        TodoStatus.TODO,
+                        2,
+                        LocalDateTime.of(2026, 4, 7, 15, 0),
+                        LocalDate.of(2026, 4, 7),
+                        LocalTime.of(15, 0),
+                        null,
+                        List.of()
+                ))
         );
     }
 }

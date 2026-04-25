@@ -1,20 +1,19 @@
 package com.dodo.todo.todo.dto;
 
-import com.dodo.todo.todo.reminder.domain.ReminderType;
-import com.dodo.todo.todo.repeat.domain.TodoRepeatType;
+import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Set;
+import java.time.LocalTime;
 
 public record TodoCreateRequest(
         @NotNull
         Long categoryId,
+
+        Long parentTodoId,
 
         @NotBlank
         @Size(max = 200)
@@ -23,49 +22,24 @@ public record TodoCreateRequest(
         @Size(max = 1000)
         String memo,
 
-        @NotBlank
-        @Size(max = 20)
-        String priority,
-
         Integer sortOrder,
 
         LocalDateTime dueAt,
 
-        List<@NotNull Long> tagIds,
+        LocalDate scheduledDate,
 
-        List<@Valid ChecklistRequest> checklists,
+        LocalTime scheduledTime,
 
         @Valid
-        RepeatRequest repeat,
-
-        List<@Valid ReminderRequest> reminders
+        RecurrenceRuleRequest recurrenceRule
 ) {
 
-    public record ChecklistRequest(
-            @NotBlank
-            @Size(max = 255)
-            String content
-    ) {
+    public RecurrenceRule getRecurrenceRule() {
+        if (recurrenceRule == null) {
+            return null;
+        }
+
+        return recurrenceRule.toRecurrenceRule();
     }
 
-    public record RepeatRequest(
-            @NotNull
-            TodoRepeatType repeatType,
-
-            @Min(1)
-            int repeatInterval,
-
-            Set<DayOfWeek> daysOfWeek
-    ) {
-    }
-
-    public record ReminderRequest(
-            @NotNull
-            ReminderType reminderType,
-
-            Integer remindBefore,
-
-            LocalDateTime remindAt
-    ) {
-    }
 }
