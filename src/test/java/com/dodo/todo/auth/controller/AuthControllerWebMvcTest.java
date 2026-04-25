@@ -22,6 +22,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -43,13 +44,12 @@ class AuthControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("소셜 로그인 요청이 성공하면 토큰 응답을 반환한다")
+    @DisplayName("소셜 로그인 응답으로 토큰을 반환한다")
     void socialLoginReturnsTokenResponse() throws Exception {
-        when(authService.login(any())).thenReturn(new TokenResponse(
-                "new-access-token",
-                "new-refresh-token",
-                "Bearer"
-        ));
+        String accessToken = "new-access-token";
+        String refreshToken = "new-refresh-token";
+        String tokenType = "Bearer";
+        when(authService.login(any())).thenReturn(new TokenResponse(accessToken, refreshToken, tokenType));
 
         mockMvc.perform(post("/api/v1/auth/social/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -61,14 +61,16 @@ class AuthControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
-                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+                .andExpect(jsonPath("$.accessToken").value(accessToken))
+                .andExpect(jsonPath("$.refreshToken").value(refreshToken))
+                .andExpect(jsonPath("$.tokenType").value(tokenType));
     }
 
     @Test
-    @DisplayName("소셜 로그인 요청값이 비어 있으면 검증 오류를 반환한다")
+    @DisplayName("소셜 로그인 요청 검증 실패 시 오류를 반환한다")
     void socialLoginReturnsValidationError() throws Exception {
+        String validationErrorCode = "VALIDATION_ERROR";
+
         mockMvc.perform(post("/api/v1/auth/social/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -79,20 +81,19 @@ class AuthControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.code").value(validationErrorCode))
                 .andExpect(jsonPath("$.validationErrors.provider").exists())
                 .andExpect(jsonPath("$.validationErrors.authorizationCode").exists())
                 .andExpect(jsonPath("$.validationErrors.redirectUri").exists());
     }
 
     @Test
-    @DisplayName("리프레시 요청이 성공하면 토큰 응답을 반환한다")
+    @DisplayName("refresh 요청 응답으로 토큰을 반환한다")
     void refreshReturnsTokenResponse() throws Exception {
-        when(authService.refresh(any())).thenReturn(new TokenResponse(
-                "new-access-token",
-                "new-refresh-token",
-                "Bearer"
-        ));
+        String accessToken = "new-access-token";
+        String refreshToken = "new-refresh-token";
+        String tokenType = "Bearer";
+        when(authService.refresh(any())).thenReturn(new TokenResponse(accessToken, refreshToken, tokenType));
 
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -102,14 +103,16 @@ class AuthControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.accessToken").value("new-access-token"))
-                .andExpect(jsonPath("$.refreshToken").value("new-refresh-token"))
-                .andExpect(jsonPath("$.tokenType").value("Bearer"));
+                .andExpect(jsonPath("$.accessToken").value(accessToken))
+                .andExpect(jsonPath("$.refreshToken").value(refreshToken))
+                .andExpect(jsonPath("$.tokenType").value(tokenType));
     }
 
     @Test
-    @DisplayName("리프레시 요청값이 비어 있으면 검증 오류를 반환한다")
+    @DisplayName("refresh 요청 검증 실패 시 오류를 반환한다")
     void refreshReturnsValidationErrorForBlankToken() throws Exception {
+        String validationErrorCode = "VALIDATION_ERROR";
+
         mockMvc.perform(post("/api/v1/auth/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -118,17 +121,19 @@ class AuthControllerWebMvcTest {
                                 }
                                 """))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.code").value(validationErrorCode))
                 .andExpect(jsonPath("$.validationErrors.refreshToken").exists());
     }
 
     @Test
-    @DisplayName("현재 회원 조회는 로그인한 회원 정보를 반환한다")
+    @DisplayName("현재 회원 조회 시 회원 정보를 반환한다")
     void meReturnsCurrentMember() throws Exception {
-        when(authService.getCurrentMember(5L)).thenReturn(new MemberResponse(5L, "me@example.com"));
-        MemberPrincipal principal = new MemberPrincipal(5L);
+        Long memberId = 5L;
+        String email = "me@example.com";
+        when(authService.getCurrentMember(memberId)).thenReturn(new MemberResponse(memberId, email));
+        MemberPrincipal principal = new MemberPrincipal(memberId);
         SecurityContextHolder.getContext().setAuthentication(
-                org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(
+                UsernamePasswordAuthenticationToken.authenticated(
                         principal,
                         null,
                         principal.getAuthorities()
@@ -137,15 +142,17 @@ class AuthControllerWebMvcTest {
 
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(5))
-                .andExpect(jsonPath("$.email").value("me@example.com"));
+                .andExpect(jsonPath("$.memberId").value(memberId))
+                .andExpect(jsonPath("$.email").value(email));
     }
 
     @Test
-    @DisplayName("현재 회원 조회 시 인증 정보가 없으면 401 응답을 반환한다")
+    @DisplayName("인증 없이 현재 회원을 조회하면 401을 반환한다")
     void meMapsUnauthorizedException() throws Exception {
+        String unauthorizedCode = "UNAUTHORIZED";
+
         mockMvc.perform(get("/api/v1/auth/me"))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+                .andExpect(jsonPath("$.code").value(unauthorizedCode));
     }
 }

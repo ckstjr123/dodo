@@ -41,28 +41,32 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("유효한 access token이면 토큰의 회원 ID로 인증 정보를 저장한다")
+    @DisplayName("유효한 access token이면 회원 인증 정보를 저장한다")
     void setsAuthenticationForValidToken() throws Exception {
+        String validToken = "valid-token";
+        Long memberId = 3L;
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithBearerToken("valid-token");
+        MockHttpServletRequest request = requestWithBearerToken(validToken);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenProvider.isValidAccessToken("valid-token")).thenReturn(true);
-        when(jwtTokenProvider.getMemberId("valid-token")).thenReturn(3L);
+        when(jwtTokenProvider.isValidAccessToken(validToken)).thenReturn(true);
+        when(jwtTokenProvider.getMemberId(validToken)).thenReturn(memberId);
 
         filter.doFilter(request, response, filterChain);
 
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNotNull();
         assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal())
-                .isInstanceOfSatisfying(MemberPrincipal.class, principal -> assertThat(principal.getId()).isEqualTo(3L));
+                .isInstanceOfSatisfying(MemberPrincipal.class, principal -> assertThat(principal.getId()).isEqualTo(memberId));
         verify(filterChain).doFilter(request, response);
     }
 
     @Test
-    @DisplayName("인증 토큰이 없으면 인증 정보 없이 다음 보안 흐름으로 넘긴다")
+    @DisplayName("인증 헤더가 없으면 다음 보안 흐름으로 진행한다")
     void proceedsWithoutAuthenticationWhenAuthorizationHeaderIsMissing() throws Exception {
+        String method = "GET";
+        String path = "/api/v1/todos";
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/todos");
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
@@ -72,10 +76,11 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("Bearer 형식이 아니면 인증 정보 없이 다음 보안 흐름으로 넘긴다")
+    @DisplayName("Bearer 형식이 아니면 인증 없이 다음 보안 흐름으로 진행한다")
     void proceedsWithoutAuthenticationWhenAuthorizationHeaderIsNotBearer() throws Exception {
+        String authorizationHeader = "Basic token";
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithAuthorization("Basic token");
+        MockHttpServletRequest request = requestWithAuthorization(authorizationHeader);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
@@ -85,12 +90,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("이미 인증 정보가 있으면 토큰을 다시 검증하지 않는다")
+    @DisplayName("이미 인증 정보가 있으면 token을 다시 검증하지 않는다")
     void skipsAuthenticationWhenSecurityContextAlreadyHasAuthentication() throws Exception {
+        String validToken = "valid-token";
+        Long memberId = 1L;
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithBearerToken("valid-token");
+        MockHttpServletRequest request = requestWithBearerToken(validToken);
         MockHttpServletResponse response = new MockHttpServletResponse();
-        Authentication authentication = authenticatedMember(1L);
+        Authentication authentication = authenticatedMember(memberId);
         SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filter.doFilter(request, response, filterChain);
@@ -100,10 +107,11 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("비어 있는 Bearer token이면 인증 실패 응답으로 넘긴다")
+    @DisplayName("비어 있는 Bearer token이면 인증 실패 응답으로 끝낸다")
     void commencesAuthenticationFailureWhenBearerTokenIsBlank() throws Exception {
+        String blankBearerToken = "Bearer ";
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithAuthorization("Bearer ");
+        MockHttpServletRequest request = requestWithAuthorization(blankBearerToken);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, filterChain);
@@ -114,13 +122,14 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("만료됐거나 유효하지 않은 token이면 인증 실패 응답으로 넘긴다")
+    @DisplayName("유효하지 않은 token이면 인증 실패 응답으로 끝낸다")
     void commencesAuthenticationFailureForInvalidToken() throws Exception {
+        String invalidToken = "bad-token";
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithBearerToken("bad-token");
+        MockHttpServletRequest request = requestWithBearerToken(invalidToken);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenProvider.isValidAccessToken("bad-token")).thenReturn(false);
+        when(jwtTokenProvider.isValidAccessToken(invalidToken)).thenReturn(false);
 
         filter.doFilter(request, response, filterChain);
 
@@ -130,14 +139,16 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("token에서 회원 ID를 읽을 수 없으면 인증 실패 응답으로 넘긴다")
+    @DisplayName("token에서 회원 ID를 읽지 못하면 인증 실패 응답으로 끝낸다")
     void commencesAuthenticationFailureWhenMemberIdCannotBeRead() throws Exception {
+        String staleToken = "stale-token";
+        String invalidSubjectMessage = "invalid subject";
         JwtAuthenticationFilter filter = new JwtAuthenticationFilter(jwtTokenProvider, authenticationEntryPoint);
-        MockHttpServletRequest request = requestWithBearerToken("stale-token");
+        MockHttpServletRequest request = requestWithBearerToken(staleToken);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        when(jwtTokenProvider.isValidAccessToken("stale-token")).thenReturn(true);
-        when(jwtTokenProvider.getMemberId("stale-token")).thenThrow(new IllegalArgumentException("invalid subject"));
+        when(jwtTokenProvider.isValidAccessToken(staleToken)).thenReturn(true);
+        when(jwtTokenProvider.getMemberId(staleToken)).thenThrow(new IllegalArgumentException(invalidSubjectMessage));
 
         filter.doFilter(request, response, filterChain);
 
@@ -156,11 +167,14 @@ class JwtAuthenticationFilterTest {
     }
 
     private MockHttpServletRequest requestWithBearerToken(String token) {
-        return requestWithAuthorization("Bearer " + token);
+        String bearerPrefix = "Bearer ";
+        return requestWithAuthorization(bearerPrefix + token);
     }
 
     private MockHttpServletRequest requestWithAuthorization(String authorizationHeader) {
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/todos");
+        String method = "GET";
+        String path = "/api/v1/todos";
+        MockHttpServletRequest request = new MockHttpServletRequest(method, path);
         request.addHeader(HttpHeaders.AUTHORIZATION, authorizationHeader);
         return request;
     }

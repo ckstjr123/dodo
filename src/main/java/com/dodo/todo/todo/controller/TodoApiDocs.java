@@ -1,6 +1,7 @@
 package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoCreateResponse;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +13,7 @@ public interface TodoApiDocs {
 
     @Operation(summary = "Todo 생성")
     @SecurityRequirement(name = "bearerAuth")
-    TodoResponse createTodo(Long memberId, TodoCreateRequest request);
+    TodoCreateResponse createTodo(Long memberId, TodoCreateRequest request);
 
     @Operation(summary = "Todo 목록 조회")
     @SecurityRequirement(name = "bearerAuth")
@@ -21,4 +22,12 @@ public interface TodoApiDocs {
     @Operation(summary = "Todo 단건 조회")
     @SecurityRequirement(name = "bearerAuth")
     TodoResponse getTodo(Long memberId, Long todoId);
+
+    @Operation(summary = "Todo 완료")
+    @SecurityRequirement(name = "bearerAuth")
+    void completeTodo(Long memberId, Long todoId);
+
+    @Operation(summary = "Todo 완료 취소")
+    @SecurityRequirement(name = "bearerAuth")
+    void undoTodo(Long memberId, Long todoId);
 }

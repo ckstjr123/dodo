@@ -10,37 +10,46 @@ import org.junit.jupiter.api.Test;
 class JwtTokenProviderTest {
 
     @Test
-    @DisplayName("access 토큰을 생성하고 회원 ID를 다시 읽을 수 있다")
+    @DisplayName("access token을 생성하고 회원 ID를 파싱한다")
     void generatesAndParsesValidAccessToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L);
+        long accessExpirationSeconds = 1800L;
+        long refreshExpirationSeconds = 604800L;
+        long memberId = 7L;
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(accessExpirationSeconds, refreshExpirationSeconds));
+        MemberPrincipal principal = new MemberPrincipal(memberId);
 
         String token = jwtTokenProvider.generateAccessToken(principal);
 
         assertThat(jwtTokenProvider.isValidAccessToken(token)).isTrue();
         assertThat(jwtTokenProvider.isValidRefreshToken(token)).isFalse();
-        assertThat(jwtTokenProvider.getMemberId(token)).isEqualTo(7L);
-        assertThat(jwtTokenProvider.getAccessTokenExpirationSeconds()).isEqualTo(1800L);
+        assertThat(jwtTokenProvider.getMemberId(token)).isEqualTo(memberId);
+        assertThat(jwtTokenProvider.getAccessTokenExpirationSeconds()).isEqualTo(accessExpirationSeconds);
     }
 
     @Test
-    @DisplayName("refresh 토큰을 생성하고 타입을 구분한다")
+    @DisplayName("refresh token을 생성한다")
     void generatesValidRefreshToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L);
+        long accessExpirationSeconds = 1800L;
+        long refreshExpirationSeconds = 604800L;
+        long memberId = 7L;
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(accessExpirationSeconds, refreshExpirationSeconds));
+        MemberPrincipal principal = new MemberPrincipal(memberId);
 
         String token = jwtTokenProvider.generateRefreshToken(principal);
 
         assertThat(jwtTokenProvider.isValidRefreshToken(token)).isTrue();
         assertThat(jwtTokenProvider.isValidAccessToken(token)).isFalse();
-        assertThat(jwtTokenProvider.getRefreshTokenExpirationSeconds()).isEqualTo(604800L);
+        assertThat(jwtTokenProvider.getRefreshTokenExpirationSeconds()).isEqualTo(refreshExpirationSeconds);
     }
 
     @Test
-    @DisplayName("같은 회원에게 연속 발급한 refresh 토큰은 jti로 인해 서로 달라진다")
+    @DisplayName("같은 회원이라도 refresh token은 매번 다르게 생성한다")
     void generatesDistinctRefreshTokensForSameMember() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L);
+        long accessExpirationSeconds = 1800L;
+        long refreshExpirationSeconds = 604800L;
+        long memberId = 7L;
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(accessExpirationSeconds, refreshExpirationSeconds));
+        MemberPrincipal principal = new MemberPrincipal(memberId);
 
         String firstToken = jwtTokenProvider.generateRefreshToken(principal);
         String secondToken = jwtTokenProvider.generateRefreshToken(principal);
@@ -49,20 +58,28 @@ class JwtTokenProviderTest {
     }
 
     @Test
-    @DisplayName("형식이 잘못된 토큰은 유효하지 않다")
+    @DisplayName("형식이 잘못된 token은 거부한다")
     void rejectsMalformedToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(1800L, 604800L));
+        long accessExpirationSeconds = 1800L;
+        long refreshExpirationSeconds = 604800L;
+        String malformedToken = "not-a-token";
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(accessExpirationSeconds, refreshExpirationSeconds));
 
-        assertThat(jwtTokenProvider.isValidToken("not-a-token")).isFalse();
-        assertThat(jwtTokenProvider.isValidAccessToken("not-a-token")).isFalse();
-        assertThat(jwtTokenProvider.isValidRefreshToken("not-a-token")).isFalse();
+        assertThat(jwtTokenProvider.isValidToken(malformedToken)).isFalse();
+        assertThat(jwtTokenProvider.isValidAccessToken(malformedToken)).isFalse();
+        assertThat(jwtTokenProvider.isValidRefreshToken(malformedToken)).isFalse();
     }
 
     @Test
-    @DisplayName("만료된 access 토큰은 유효하지 않다")
+    @DisplayName("만료된 access token은 거부한다")
     void rejectsExpiredAccessToken() {
-        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(-1L, 604800L));
-        MemberPrincipal principal = new MemberPrincipal(7L);
+        long expiredAccessExpirationSeconds = -1L;
+        long refreshExpirationSeconds = 604800L;
+        long memberId = 7L;
+        JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(
+                jwtProperties(expiredAccessExpirationSeconds, refreshExpirationSeconds)
+        );
+        MemberPrincipal principal = new MemberPrincipal(memberId);
 
         String token = jwtTokenProvider.generateAccessToken(principal);
 
@@ -70,8 +87,9 @@ class JwtTokenProviderTest {
     }
 
     private JwtProperties jwtProperties(long accessExpirationSeconds, long refreshExpirationSeconds) {
+        String secret = "test-secret-key-test-secret-key-1234";
         JwtProperties jwtProperties = new JwtProperties();
-        jwtProperties.setSecret("test-secret-key-test-secret-key-1234");
+        jwtProperties.setSecret(secret);
         jwtProperties.setAccessTokenExpirationSeconds(accessExpirationSeconds);
         jwtProperties.setRefreshTokenExpirationSeconds(refreshExpirationSeconds);
         return jwtProperties;

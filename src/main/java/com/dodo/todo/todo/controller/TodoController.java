@@ -1,6 +1,7 @@
 package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
+import com.dodo.todo.todo.dto.TodoCreateResponse;
 import com.dodo.todo.todo.dto.TodoCreateRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
@@ -9,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -26,8 +28,8 @@ public class TodoController implements TodoApiDocs {
     @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TodoResponse createTodo(@LoginMember Long memberId, @Valid @RequestBody TodoCreateRequest request) {
-        return todoService.createTodo(memberId, request);
+    public TodoCreateResponse createTodo(@LoginMember Long memberId, @Valid @RequestBody TodoCreateRequest request) {
+        return new TodoCreateResponse(todoService.saveTodo(memberId, request));
     }
 
     @Override
@@ -37,8 +39,22 @@ public class TodoController implements TodoApiDocs {
     }
 
     @Override
-    @GetMapping("/{todoId}")
+    @GetMapping("/{parentTodoId}")
     public TodoResponse getTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
         return todoService.getTodo(memberId, todoId);
+    }
+
+    @Override
+    @PatchMapping("/{parentTodoId}/complete")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void completeTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
+        todoService.completeTodo(memberId, todoId);
+    }
+
+    @Override
+    @PatchMapping("/{parentTodoId}/undo")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void undoTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
+        todoService.undoTodo(memberId, todoId);
     }
 }

@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.member.domain.MemberRepository;
+import com.dodo.todo.member.repository.MemberRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,22 +27,27 @@ class MemberServiceTest {
     @Test
     @DisplayName("ID로 회원을 조회한다")
     void findById() {
-        Member member = Member.of("member@example.com");
+        Long memberId = 1L;
+        String email = "member@example.com";
+        Member member = Member.of(email);
 
-        when(memberRepository.findById(1L)).thenReturn(Optional.of(member));
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
-        Member foundMember = memberService.findById(1L);
+        Member foundMember = memberService.findById(memberId);
 
         assertThat(foundMember).isSameAs(member);
     }
 
     @Test
-    @DisplayName("ID로 회원을 찾지 못하면 예외가 발생한다")
+    @DisplayName("ID로 회원을 찾을 수 없으면 예외가 발생한다")
     void rejectMissingMember() {
-        when(memberRepository.findById(99L)).thenReturn(Optional.empty());
+        Long missingMemberId = 99L;
+        String expectedMessage = "Member not found";
 
-        assertThatThrownBy(() -> memberService.findById(99L))
+        when(memberRepository.findById(missingMemberId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> memberService.findById(missingMemberId))
                 .isInstanceOf(ApiException.class)
-                .hasMessage("Member not found");
+                .hasMessage(expectedMessage);
     }
 }
