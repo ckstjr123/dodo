@@ -118,10 +118,6 @@ public class Todo extends BaseEntity {
         this.recurrenceRule = recurrenceRule;
     }
 
-    public Long getMemberId() {
-        return member.getId();
-    }
-
     public Long getCategoryId() {
         return category.getId();
     }
