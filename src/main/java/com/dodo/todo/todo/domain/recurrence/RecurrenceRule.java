@@ -1,40 +1,40 @@
 package com.dodo.todo.todo.domain.recurrence;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.regex.Pattern;
 import net.fortuna.ical4j.model.Recur;
+import net.fortuna.ical4j.model.WeekDay;
 
 public record RecurrenceRule(
         Frequency frequency,
         int interval,
-        List<String> byDay,
+        @JsonSerialize(using = WeekDaysSerializer.class)
+        @JsonDeserialize(using = WeekDaysDeserializer.class)
+        WeekDays byDay,
         Integer byMonthDay,
         LocalDate until
 ) {
 
-    private static final Map<String, DayOfWeek> DAYS = Map.of(
-            "MO", DayOfWeek.MONDAY,
-            "TU", DayOfWeek.TUESDAY,
-            "WE", DayOfWeek.WEDNESDAY,
-            "TH", DayOfWeek.THURSDAY,
-            "FR", DayOfWeek.FRIDAY,
-            "SA", DayOfWeek.SATURDAY,
-            "SU", DayOfWeek.SUNDAY
+    private static final Map<WeekDay.Day, DayOfWeek> DAYS = Map.of(
+            WeekDay.Day.MO, DayOfWeek.MONDAY,
+            WeekDay.Day.TU, DayOfWeek.TUESDAY,
+            WeekDay.Day.WE, DayOfWeek.WEDNESDAY,
+            WeekDay.Day.TH, DayOfWeek.THURSDAY,
+            WeekDay.Day.FR, DayOfWeek.FRIDAY,
+            WeekDay.Day.SA, DayOfWeek.SATURDAY,
+            WeekDay.Day.SU, DayOfWeek.SUNDAY
     );
 
-    private static final Pattern MONTHLY_BY_DAY = Pattern.compile("[1-5](MO|TU|WE|TH|FR|SA|SU)");
-
     public RecurrenceRule {
-        byDay = byDay == null ? List.of() : byDay.stream()
-                .map(day -> day.toUpperCase(Locale.ROOT))
-                .toList();
+        if (byDay == null) {
+            byDay = WeekDays.empty();
+        }
         validate(frequency, interval, byDay, byMonthDay);
     }
 
@@ -46,25 +46,24 @@ public record RecurrenceRule(
         if (currentDate == null) {
             throw new IllegalArgumentException("Current date is required");
         }
+
         if (frequency == Frequency.MONTHLY && byMonthDay != null) {
             LocalDate nextMonth = currentDate.withDayOfMonth(1).plusMonths(interval);
             LocalDate nextDate = nextMonth.withDayOfMonth(Math.min(byMonthDay, nextMonth.lengthOfMonth()));
-            return isAfterUntil(nextDate) ? null : nextDate;
+            return isAfterEndDate(nextDate) ? null : nextDate;
         }
         if (frequency == Frequency.MONTHLY && !byDay.isEmpty()) {
             LocalDate currentMonthStart = currentDate.withDayOfMonth(1);
             LocalDate nextMonthStart = currentDate.plusMonths(interval).withDayOfMonth(1);
 
-            LocalDate nextDate = byDay.stream()
-                    .map(day -> monthlyByDayDate(currentMonthStart, day))
-                    .filter(date -> date.isAfter(currentDate))
-                    .min(LocalDate::compareTo)
-                    .orElseGet(() -> byDay.stream()
-                            .map(day -> monthlyByDayDate(nextMonthStart, day))
-                            .min(LocalDate::compareTo)
-                            .orElseThrow());
+            LocalDate nextDate = byDay.findEarliestDateAfter(
+                    currentDate,
+                    day -> monthlyByDayDate(currentMonthStart, day)
+            ).orElseGet(() -> byDay.findEarliestDate(
+                    day -> monthlyByDayDate(nextMonthStart, day)
+            ).orElseThrow());
 
-            return isAfterUntil(nextDate) ? null : nextDate;
+            return isAfterEndDate(nextDate) ? null : nextDate;
         }
 
         Recur<LocalDate> recur = new Recur<>(toRRuleText());
@@ -78,7 +77,7 @@ public record RecurrenceRule(
                 .append(interval);
 
         if (!byDay.isEmpty()) {
-            rule.append(";BYDAY=").append(String.join(",", byDay));
+            rule.append(";BYDAY=").append(byDay.toRRuleValue());
         }
         if (byMonthDay != null) {
             rule.append(";BYMONTHDAY=").append(byMonthDay);
@@ -90,13 +89,13 @@ public record RecurrenceRule(
         return rule.toString();
     }
 
-    private boolean isAfterUntil(LocalDate date) {
+    private boolean isAfterEndDate(LocalDate date) {
         return until != null && date.isAfter(until);
     }
 
-    private LocalDate monthlyByDayDate(LocalDate monthStart, String day) {
-        int week = Character.getNumericValue(day.charAt(0));
-        DayOfWeek dayOfWeek = DAYS.get(day.substring(1));
+    private LocalDate monthlyByDayDate(LocalDate monthStart, WeekDay day) {
+        int week = day.getOffset();
+        DayOfWeek dayOfWeek = DAYS.get(day.getDay());
         LocalDate firstDay = monthStart.with(TemporalAdjusters.firstInMonth(dayOfWeek));
         LocalDate nthDay = firstDay.plusWeeks(week - 1L);
 
@@ -107,7 +106,7 @@ public record RecurrenceRule(
         return monthStart.with(TemporalAdjusters.lastInMonth(dayOfWeek));
     }
 
-    private static void validate(Frequency frequency, int interval, List<String> byDay, Integer byMonthDay) {
+    private static void validate(Frequency frequency, int interval, WeekDays byDay, Integer byMonthDay) {
         if (frequency == null) {
             throw new IllegalArgumentException("Frequency is required");
         }
@@ -128,8 +127,8 @@ public record RecurrenceRule(
                 if (byDay.isEmpty()) {
                     throw new IllegalArgumentException("Weekly recurrence requires RFC 5545 day values");
                 }
-                if (byDay.stream().anyMatch(day -> !DAYS.containsKey(day))) {
-                    throw new IllegalArgumentException("Weekly recurrence requires RFC 5545 day values");
+                if (byDay.hasOrdinalWeekday()) {
+                    throw new IllegalArgumentException("Weekly recurrence must not have offsets");
                 }
             }
             case MONTHLY -> {
@@ -139,7 +138,7 @@ public record RecurrenceRule(
                 if (byMonthDay != null && (byMonthDay < 1 || byMonthDay > 31)) {
                     throw new IllegalArgumentException("ByMonthDay must be between 1 and 31");
                 }
-                if (!byDay.isEmpty() && byDay.stream().anyMatch(day -> !MONTHLY_BY_DAY.matcher(day).matches())) {
+                if (!byDay.isEmpty() && byDay.hasOffsetOutOfRange(1, 5)) {
                     throw new IllegalArgumentException("Monthly byDay must be 1MO through 5SU");
                 }
             }

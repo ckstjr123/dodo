@@ -9,7 +9,7 @@ import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
-import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
@@ -31,7 +31,7 @@ public class TodoService {
     private final TodoHistoryRepository todoHistoryRepository;
 
     @Transactional
-    public Long saveTodo(Long memberId, TodoCreateRequest request) {
+    public Long saveTodo(Long memberId, TodoRequest request) {
         Member member = memberService.findById(memberId);
         Category category = findCategory(member, request.categoryId());
         Todo mainTodo = findMainTodo(memberId, request.parentTodoId());

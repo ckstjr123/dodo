@@ -1,6 +1,6 @@
 package com.dodo.todo.todo.controller;
 
-import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoCreateResponse;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
@@ -13,7 +13,7 @@ public interface TodoApiDocs {
 
     @Operation(summary = "Todo 생성")
     @SecurityRequirement(name = "bearerAuth")
-    TodoCreateResponse createTodo(Long memberId, TodoCreateRequest request);
+    TodoCreateResponse createTodo(Long memberId, TodoRequest request);
 
     @Operation(summary = "Todo 목록 조회")
     @SecurityRequirement(name = "bearerAuth")
