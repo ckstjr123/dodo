@@ -1,17 +1,5 @@
 package com.dodo.todo.todo.service;
 
-import static com.dodo.todo.util.TestFixture.createCategory;
-import static com.dodo.todo.util.TestFixture.createMember;
-import static com.dodo.todo.util.TestFixture.createRecurringTodo;
-import static com.dodo.todo.util.TestFixture.createSubTodo;
-import static com.dodo.todo.util.TestFixture.createTodo;
-import static com.dodo.todo.util.TestFixture.setId;
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.category.repository.CategoryRepository;
 import com.dodo.todo.common.exception.ApiException;
@@ -26,17 +14,25 @@ import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
 import com.dodo.todo.todo.dto.TodoCreateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.List;
+import java.util.Optional;
+
+import static com.dodo.todo.util.TestFixture.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
@@ -80,7 +76,7 @@ class TodoServiceTest {
         Long savedTodoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo savedTodo = createTodo(member, category, "prepare", savedTodoId);
+        Todo savedTodo = createTodo(savedTodoId, member, category, "title", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
@@ -99,7 +95,7 @@ class TodoServiceTest {
         Long mainTodoId = 8L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo mainTodo = createTodo(member, category, "main", 7L);
+        Todo mainTodo = createTodo(7L, member, category, "main", TodoStatus.TODO);
         Todo subTodo = createSubTodo(member, category, mainTodo, "sub", mainTodoId);
 
         when(memberService.findById(memberId)).thenReturn(member);
@@ -118,7 +114,7 @@ class TodoServiceTest {
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo todo = createTodo(member, category, "prepare", todoId);
+        Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
@@ -135,7 +131,15 @@ class TodoServiceTest {
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo todo = createRecurringTodo(member, category, "recurring", todoId);
+        Todo todo = createRecurringTodo(
+                todoId,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                LocalDate.of(2026, 4, 7),
+                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null)
+        );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
@@ -147,21 +151,22 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("종료일이 지난 반복 Todo를 완료하면 DONE 상태가 된다")
-    void completeRecurringTodoAfterUntil() {
+    @DisplayName("반복 종료일에 도달한 Todo를 완료하면 다음 일정이 없어 DONE 상태가 된다")
+    void completeRecurringTodoOnUntilDate() {
         Long memberId = 1L;
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo todo = Todo.builder()
-                .member(member)
-                .category(category)
-                .title("recurring")
-                .status(TodoStatus.TODO)
-                .scheduledDate(LocalDate.of(2026, 4, 10))
-                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 4, 10)))
-                .build();
-        setId(todo, todoId);
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 10);
+        Todo todo = createRecurringTodo(
+                todoId,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, scheduledDate)
+        );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
@@ -177,14 +182,15 @@ class TodoServiceTest {
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo todo = Todo.builder()
-                .member(member)
-                .category(category)
-                .title("recurring")
-                .status(TodoStatus.DONE)
-                .scheduledDate(LocalDate.of(2026, 4, 10))
-                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 4, 10)))
-                .build();
+        Todo todo = createRecurringTodo(
+                todoId,
+                member,
+                category,
+                "recurring",
+                TodoStatus.DONE,
+                LocalDate.of(2026, 4, 10),
+                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 5, 10))
+        );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
@@ -197,7 +203,7 @@ class TodoServiceTest {
         return new TodoCreateRequest(
                 categoryId,
                 mainTodoId,
-                "prepare",
+                "title",
                 "memo",
                 1,
                 LocalDateTime.of(2026, 4, 7, 18, 0),

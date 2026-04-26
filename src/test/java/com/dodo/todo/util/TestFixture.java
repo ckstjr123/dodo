@@ -4,12 +4,9 @@ import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -32,30 +29,40 @@ public final class TestFixture {
     }
 
     public static Todo createTodo(Member member, Category category, String title) {
-        return createTodo(member, category, null, title, null, null);
+        return createTodo(member, category, null, title, TodoStatus.TODO, null);
     }
 
-    public static Todo createTodo(Member member, Category category, String title, Long id) {
-        Todo todo = createTodo(member, category, title);
+    public static Todo createTodo(Long id, Member member, Category category, String title, TodoStatus status) {
+        Todo todo = createTodo(member, category, null, title, status, null);
         setId(todo, id);
         return todo;
     }
 
-    public static Todo createRecurringTodo(Member member, Category category, String title, Long id) {
-        Todo todo = createTodo(
-                member,
-                category,
-                null,
-                title,
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null),
-                null
-        );
+    public static Todo createRecurringTodo(
+            Long id,
+            Member member,
+            Category category,
+            String title,
+            TodoStatus status,
+            LocalDate scheduledDate,
+            RecurrenceRule recurrenceRule
+    ) {
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(null)
+                .title(title)
+                .status(status)
+                .scheduledDate(scheduledDate)
+                .recurrenceRule(recurrenceRule)
+                .dueAt(null)
+                .build();
         setId(todo, id);
         return todo;
     }
 
     public static Todo createSubTodo(Member member, Category category, Todo mainTodo, String title, Long id) {
-        Todo todo = createTodo(member, category, mainTodo, title, null, null);
+        Todo todo = createTodo(member, category, mainTodo, title, TodoStatus.TODO, null);
         setId(todo, id);
         return todo;
     }
@@ -65,7 +72,7 @@ public final class TestFixture {
             Category category,
             Todo mainTodo,
             String title,
-            RecurrenceRule recurrenceRule,
+            TodoStatus status,
             LocalDateTime dueAt
     ) {
         return Todo.builder()
@@ -73,14 +80,12 @@ public final class TestFixture {
                 .category(category)
                 .mainTodo(mainTodo)
                 .title(title)
-                .status(TodoStatus.TODO)
-                .scheduledDate(recurrenceRule == null ? null : LocalDate.of(2026, 4, 7))
-                .recurrenceRule(recurrenceRule)
+                .status(status)
                 .dueAt(dueAt)
                 .build();
     }
 
-    public static void setId(Object target, Long id) {
+    private static void setId(Object target, long id) {
         ReflectionTestUtils.setField(target, "id", id);
     }
 }
