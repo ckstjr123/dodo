@@ -216,39 +216,30 @@ HAVING COUNT(m) > 5
     @Test
     @DisplayName("지원자를 최종 합격시킨다")
     void should_pass_applicant() {
-        // given
         JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.IN_PROGRESS);
 
-        // when
         jobApplicant.pass();
 
-        // then
         assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.PASS);
     }
 
     @Test
     @DisplayName("지원서를 불합격시킨다")
     void should_fail_applicant() {
-        // given
         JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.IN_PROGRESS);
 
-        // when
         jobApplicant.fail();
 
-        // then
         assertThat(jobApplicant.getStatus()).isEqualTo(JobApplicantStatus.FAIL);
     }
 
     @Test
     @DisplayName("지원서를 불합격 상태일 때 보관할 수 있다")
     void store_failed_applicant() {
-        // given
         JobApplicant jobApplicant = JobApplicantFixture.create(JobApplicantStatus.FAIL);
 
-        // when
         jobApplicant.putStorage();
 
-        // then
         assertThat(jobApplicant.isStorage()).isTrue();
     }
   }
