@@ -10,8 +10,9 @@ import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.WeekDays;
 import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
-import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -63,7 +64,7 @@ class TodoServiceTest {
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
 
-        assertThatThrownBy(() -> todoService.saveTodo(memberId, createRequest(categoryId, null, null)))
+        assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, null, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Category not found");
     }
@@ -82,7 +83,7 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
         when(todoRepository.save(any(Todo.class))).thenReturn(savedTodo);
 
-        Long todoId = todoService.saveTodo(memberId, createRequest(categoryId, null, null));
+        Long todoId = todoService.saveTodo(memberId, createTodoRequest(categoryId, null, null));
 
         assertThat(todoId).isEqualTo(savedTodoId);
     }
@@ -102,7 +103,7 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
         when(todoRepository.findByIdAndMemberId(mainTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
-        assertThatThrownBy(() -> todoService.saveTodo(memberId, createRequest(categoryId, mainTodoId, null)))
+        assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, mainTodoId, null)))
                 .isInstanceOf(ApiException.class)
                 .hasMessage("Todo depth must not exceed 2");
     }
@@ -131,14 +132,15 @@ class TodoServiceTest {
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 7);
         Todo todo = createRecurringTodo(
                 todoId,
                 member,
                 category,
                 "recurring",
                 TodoStatus.TODO,
-                LocalDate.of(2026, 4, 7),
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null)
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null)
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -146,7 +148,7 @@ class TodoServiceTest {
         todoService.completeTodo(memberId, todoId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
-        assertThat(todo.getScheduledDate()).isEqualTo(LocalDate.of(2026, 4, 8));
+        assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate.plusDays(1));
         verify(todoHistoryRepository).save(any(TodoHistory.class));
     }
 
@@ -157,7 +159,7 @@ class TodoServiceTest {
         Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        LocalDate scheduledDate = LocalDate.of(2026, 4, 10);
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 10), until = scheduledDate;
         Todo todo = createRecurringTodo(
                 todoId,
                 member,
@@ -165,7 +167,7 @@ class TodoServiceTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, scheduledDate)
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until)
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -189,7 +191,7 @@ class TodoServiceTest {
                 "recurring",
                 TodoStatus.DONE,
                 LocalDate.of(2026, 4, 10),
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 5, 10))
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 5, 10))
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -199,8 +201,8 @@ class TodoServiceTest {
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
     }
 
-    private TodoCreateRequest createRequest(Long categoryId, Long mainTodoId, RecurrenceRule recurrenceRule) {
-        return new TodoCreateRequest(
+    private TodoRequest createTodoRequest(Long categoryId, Long mainTodoId, RecurrenceRule recurrenceRule) {
+        return new TodoRequest(
                 categoryId,
                 mainTodoId,
                 "title",
@@ -221,7 +223,7 @@ class TodoServiceTest {
         return new RecurrenceRuleRequest(
                 recurrenceRule.frequency(),
                 recurrenceRule.interval(),
-                recurrenceRule.byDay(),
+                recurrenceRule.byDay().toStrings(),
                 recurrenceRule.byMonthDay(),
                 recurrenceRule.until()
         );

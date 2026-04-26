@@ -15,7 +15,7 @@ import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.service.TodoService;
@@ -68,7 +68,7 @@ class TodoControllerWebMvcTest {
                   "scheduledTime": "14:00:00"
                 }
                 """;
-        when(todoService.saveTodo(eq(memberId), any(TodoCreateRequest.class))).thenReturn(todoId);
+        when(todoService.saveTodo(eq(memberId), any(TodoRequest.class))).thenReturn(todoId);
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")

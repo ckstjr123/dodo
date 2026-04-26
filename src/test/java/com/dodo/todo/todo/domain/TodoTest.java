@@ -4,12 +4,16 @@ import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.WeekDays;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.List;
+import net.fortuna.ical4j.model.WeekDay;
 
 import static com.dodo.todo.util.TestFixture.createRecurringTodo;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -112,7 +116,7 @@ class TodoTest {
                 .category(category)
                 .title("recurring")
                 .status(TodoStatus.TODO)
-                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null))
+                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null))
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("Scheduled date is required for recurring todo");
@@ -123,28 +127,7 @@ class TodoTest {
     void completeRecurringTodo() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "work");
-        Todo todo = createRecurringTodo(
-                1L,
-                member,
-                category,
-                "recurring",
-                TodoStatus.TODO,
-                LocalDate.of(2026, 4, 7),
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null)
-        );
-
-        todo.complete();
-
-        assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
-        assertThat(todo.getScheduledDate()).isEqualTo(LocalDate.of(2026, 4, 8));
-    }
-
-    @Test
-    @DisplayName("반복 종료일에 도달한 Todo를 완료하면 다음 일정이 없어 DONE 상태가 된다")
-    void completeRecurringTodoOnUntilDate() {
-        Member member = Member.of("member@example.com");
-        Category category = Category.create(member, "work");
-        LocalDate scheduledDate = LocalDate.of(2026, 4, 10);
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 7);
         Todo todo = createRecurringTodo(
                 1L,
                 member,
@@ -152,7 +135,29 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, scheduledDate)
+                new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.from(List.of(WeekDay.FR)), null, null)
+        );
+
+        todo.complete();
+
+        assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate.with(TemporalAdjusters.next(DayOfWeek.FRIDAY)));
+    }
+
+    @Test
+    @DisplayName("반복 종료일에 도달한 Todo를 완료하면 다음 일정이 없어 DONE 상태가 된다")
+    void completeRecurringTodoOnUntilDate() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 10), until = scheduledDate;
+        Todo todo = createRecurringTodo(
+                1L,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until)
         );
 
         todo.complete();
@@ -180,7 +185,7 @@ class TodoTest {
                 "sub recurring",
                 TodoStatus.TODO,
                 LocalDate.of(2026, 4, 7),
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, null)
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null)
         );
         ReflectionTestUtils.setField(subTodo, "mainTodo", mainTodo);
         setSubTodos(mainTodo, subTodo);
@@ -203,7 +208,7 @@ class TodoTest {
                 "recurring",
                 TodoStatus.DONE,
                 LocalDate.of(2026, 4, 10),
-                new RecurrenceRule(Frequency.DAILY, 1, List.of(), null, LocalDate.of(2026, 5, 10))
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 5, 10))
         );
 
         todo.undo();

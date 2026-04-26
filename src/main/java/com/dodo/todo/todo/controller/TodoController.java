@@ -2,7 +2,7 @@ package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
 import com.dodo.todo.todo.dto.TodoCreateResponse;
-import com.dodo.todo.todo.dto.TodoCreateRequest;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.service.TodoService;
@@ -28,7 +28,7 @@ public class TodoController implements TodoApiDocs {
     @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public TodoCreateResponse createTodo(@LoginMember Long memberId, @Valid @RequestBody TodoCreateRequest request) {
+    public TodoCreateResponse createTodo(@LoginMember Long memberId, @Valid @RequestBody TodoRequest request) {
         return new TodoCreateResponse(todoService.saveTodo(memberId, request));
     }
 
