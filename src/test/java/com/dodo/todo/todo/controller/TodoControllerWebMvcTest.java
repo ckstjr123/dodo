@@ -141,6 +141,18 @@ class TodoControllerWebMvcTest {
     }
 
     @Test
+    @DisplayName("Todo 완료 취소 요청은 204를 반환한다")
+    void undoTodoReturnsNoContent() throws Exception {
+        Long memberId = 5L;
+        Long todoId = 7L;
+        doNothing().when(todoService).undoTodo(memberId, todoId);
+        authenticate(memberId);
+
+        mockMvc.perform(patch("/api/v1/todos/{todoId}/undo", todoId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     @DisplayName("인증 없이 Todo 목록을 조회하면 401을 반환한다")
     void getTodosReturnsUnauthorizedWithoutAuthentication() throws Exception {
         mockMvc.perform(get("/api/v1/todos"))
