@@ -44,9 +44,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
             JOIN FETCH todo.category
             LEFT JOIN FETCH todo.subTodos subTodo
             LEFT JOIN FETCH subTodo.category
-            WHERE todo.id = :parentTodoId
+            WHERE todo.id = :todoId
               and todo.member.id = :memberId
             """)
-    Optional<Todo> findWithSubTodos(@Param("parentTodoId") Long todoId,
+    Optional<Todo> findWithSubTodos(@Param("todoId") Long todoId,
                                     @Param("memberId") Long memberId);
 }

@@ -1,72 +1,139 @@
 package com.dodo.todo.todo.domain;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
-
-import com.dodo.todo.todo.domain.recurrence.Frequency;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
-import com.dodo.todo.todo.domain.recurrence.WeekDays;
-import java.time.LocalDate;
-import java.util.List;
-import net.fortuna.ical4j.model.WeekDay;
+import com.dodo.todo.todo.domain.recurrence.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.temporal.TemporalAdjusters;
+import java.util.List;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class RecurrenceRuleTest {
 
     @Test
     @DisplayName("일 반복은 ical4j를 사용해 다음 날짜를 계산한다")
     void dailyNextDate() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.DAILY, 2, WeekDays.empty(), null, null);
+        int interval = 2;
+        LocalDate date = LocalDate.of(2026, 4, 7);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.DAILY,
+                interval,
+                WeekDays.empty(),
+                null,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
 
-        assertThat(rule.nextDate(LocalDate.of(2026, 4, 7))).isEqualTo(LocalDate.of(2026, 4, 9));
+        assertThat(rule.nextDate(date))
+                .contains(date.plusDays(interval));
     }
 
     @Test
     @DisplayName("주 반복은 RFC 5545 BYDAY를 사용해 다음 날짜를 계산한다")
     void weeklyNextDate() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.from(List.of(WeekDay.MO, WeekDay.FR)), null, null);
+        LocalDate date = LocalDate.of(2026, 4, 7);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.WEEKLY,
+                1,
+                WeekDays.of(0, List.of(Day.MO, Day.FR)),
+                null,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
 
-        assertThat(rule.nextDate(LocalDate.of(2026, 4, 7))).isEqualTo(LocalDate.of(2026, 4, 10));
+        assertThat(rule.nextDate(date))
+                .contains(date.with(TemporalAdjusters.next(DayOfWeek.FRIDAY)));
     }
 
     @Test
-    @DisplayName("월 특정일 반복은 해당 월 마지막 날로 보정한다")
-    void monthlyByMonthDayAdjustsLastDay() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.MONTHLY, 1, WeekDays.empty(), 31, null);
+    @DisplayName("월 n주차 요일 반복은 다음 달의 지정 주차 요일을 계산한다")
+    void monthlyNthWeekdayNextDate() {
+        LocalDate date = LocalDate.of(2026, 1, 12);
+        LocalDate nextMonth = date.withDayOfMonth(1).plusMonths(1);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.of(2, List.of(Day.MO)),
+                null,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
 
-        assertThat(rule.nextDate(LocalDate.of(2026, 1, 31))).isEqualTo(LocalDate.of(2026, 2, 28));
+        assertThat(rule.nextDate(date))
+                .contains(nextMonth.with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY)));
     }
 
     @Test
-    @DisplayName("월 5주차 요일 반복은 마지막 해당 요일로 보정한다")
+    @DisplayName("월 byDay일 때 같은 달에 남은 후보가 있으면 다음 달로 넘어가지 않는다")
+    void monthlyByDaySelectsSameMonthWeekdayAfterCurrentDate() {
+        LocalDate date = LocalDate.of(2026, 2, 1);
+        LocalDate month = date.withDayOfMonth(1);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.of(2, List.of(Day.MO)),
+                null,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
+
+        assertThat(rule.nextDate(date))
+                .contains(month.with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY)));
+    }
+
+    @Test
+    @DisplayName("5주차가 없는 달은 마지막 주 요일로 보정한다")
     void monthlyFifthWeekAdjustsLastWeekday() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.MONTHLY, 1, WeekDays.from(List.of(new WeekDay(WeekDay.FR, 5))), null, null);
+        LocalDate date = LocalDate.of(2026, 1, 30);
+        LocalDate nextMonth = date.withDayOfMonth(1).plusMonths(1);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.of(5, List.of(Day.FR)),
+                null,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
 
-        assertThat(rule.nextDate(LocalDate.of(2026, 1, 30))).isEqualTo(LocalDate.of(2026, 2, 27));
+        assertThat(rule.nextDate(date))
+                .contains(nextMonth.with(TemporalAdjusters.lastInMonth(DayOfWeek.FRIDAY)));
     }
 
     @Test
-    @DisplayName("주 반복은 RFC 5545 요일 값만 허용한다")
-    void rejectInvalidWeeklyByDay() {
-        assertThatThrownBy(() -> new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.from(List.of(new WeekDay(WeekDay.MO, 1))), null, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Weekly recurrence must not have offsets");
+    @DisplayName("월 반복 일자가 대상 월 마지막 날보다 크면 말일로 보정한다")
+    void monthlyByMonthDayAdjustsLastDay() {
+        LocalDate date = LocalDate.of(2026, 1, 31);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.empty(),
+                31,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
+
+        assertThat(rule.nextDate(date))
+                .contains(YearMonth.from(date).plusMonths(1).atEndOfMonth());
     }
 
     @Test
-    @DisplayName("월 반복도 종료일을 넘으면 null을 반환한다")
-    void monthlyNextDateReturnsNullAfterUntil() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.MONTHLY, 1, WeekDays.empty(), 31, LocalDate.of(2026, 2, 28));
+    @DisplayName("요청 계층 검증을 거치지 않으면 생성자는 byDay와 byMonthDay를 함께 받을 수 있다")
+    void constructorAcceptsByDayAndByMonthDay() {
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.of(2, List.of(Day.MO)),
+                15,
+                null,
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
 
-        assertThat(rule.nextDate(LocalDate.of(2026, 2, 28))).isNull();
+        assertThat(rule.byDay().days()).containsExactly(Day.MO);
+        assertThat(rule.byMonthDay()).isEqualTo(15);
     }
 
-    @Test
-    @DisplayName("UNTIL 값을 RRULE 문자열에 포함한다")
-    void includeUntilInRRuleText() {
-        RecurrenceRule rule = new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 4, 10));
-
-        assertThat(rule.toRRuleText()).isEqualTo("FREQ=DAILY;INTERVAL=1;UNTIL=20260410");
-    }
 }

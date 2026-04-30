@@ -11,6 +11,8 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 import com.dodo.todo.auth.social.domain.SocialProvider;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -22,9 +24,11 @@ import org.springframework.web.client.RestTemplate;
 
 class GoogleApiAuthClientTest {
 
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     @Test
     @DisplayName("authorization code를 Google에 검증하고 사용자 정보를 반환한다")
-    void authenticateReturnsOAuthUserInfo() {
+    void authenticateReturnsOAuthUserInfo() throws Exception {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
         GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate, "client-id", "client-secret");
@@ -32,22 +36,12 @@ class GoogleApiAuthClientTest {
         server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_TOKEN_URL))
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
-                .andRespond(withSuccess("""
-                        {
-                          "access_token": "google-access-token"
-                        }
-                        """, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(toJson(tokenResponse()), MediaType.APPLICATION_JSON));
 
         server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_USER_INFO_URL))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer google-access-token"))
-                .andRespond(withSuccess("""
-                        {
-                          "sub": "google-123",
-                          "email": "google@example.com",
-                          "email_verified": true
-                        }
-                        """, MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(toJson(userInfoResponse()), MediaType.APPLICATION_JSON));
 
         var userInfo = client.authenticate("google-code", "http://localhost:5173/auth/callback");
 
@@ -72,5 +66,21 @@ class GoogleApiAuthClientTest {
         assertThatThrownBy(() -> client.authenticate("bad-code", "http://localhost:5173/auth/callback"))
                 .isInstanceOf(HttpClientErrorException.Unauthorized.class);
         server.verify();
+    }
+
+    private GoogleApiAuthClient.GoogleTokenResponse tokenResponse() {
+        return new GoogleApiAuthClient.GoogleTokenResponse("google-access-token");
+    }
+
+    private GoogleApiAuthClient.GoogleUserInfoResponse userInfoResponse() {
+        return new GoogleApiAuthClient.GoogleUserInfoResponse(
+                "google-123",
+                "google@example.com",
+                true
+        );
+    }
+
+    private String toJson(Object value) throws JsonProcessingException {
+        return objectMapper.writeValueAsString(value);
     }
 }

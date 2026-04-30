@@ -2,6 +2,7 @@ package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
 import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.dto.TodoHistoryListResponse;
 import com.dodo.todo.todo.dto.TodoHistoryResponse;
@@ -11,7 +12,6 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
-import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -40,7 +40,11 @@ public class TodoHistoryController implements TodoHistoryApiDocs {
             @RequestParam(defaultValue = "30") Integer size
     ) {
         if ((cursorCompletedAt == null) != (cursorId == null)) {
-            throw new ApiException("VALIDATION_ERROR", HttpStatus.BAD_REQUEST, "Cursor completedAt and cursorId must be provided together");
+            throw new ApiException(
+                    TodoError.INVALID_CURSOR.code(),
+                    TodoError.INVALID_CURSOR.status(),
+                    TodoError.INVALID_CURSOR.message()
+            );
         }
 
         int pageSize = size < 1 ? DEFAULT_HISTORY_SIZE : Math.min(size, MAX_HISTORY_SIZE);

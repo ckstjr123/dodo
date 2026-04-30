@@ -1,0 +1,2 @@
+ALTER TABLE todo
+    ADD COLUMN completed_at DATETIME(6) NULL;

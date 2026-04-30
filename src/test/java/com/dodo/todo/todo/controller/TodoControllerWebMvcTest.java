@@ -15,10 +15,17 @@ import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
 import com.dodo.todo.todo.domain.TodoStatus;
+import com.dodo.todo.todo.domain.recurrence.Day;
+import com.dodo.todo.todo.domain.recurrence.Frequency;
+import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
+import com.dodo.todo.todo.dto.ByDayRequest;
+import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
+import com.dodo.todo.todo.dto.RecurrenceRuleResponse;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.service.TodoService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -44,6 +51,9 @@ class TodoControllerWebMvcTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @MockitoBean
     private TodoService todoService;
 
@@ -57,23 +67,13 @@ class TodoControllerWebMvcTest {
     void createTodoReturnsCreatedResponse() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        String requestBody = """
-                {
-                  "categoryId": 10,
-                  "title": "보고서 작성",
-                  "memo": "초안부터 작성",
-                  "sortOrder": 1,
-                  "dueAt": "2026-04-07T18:00:00",
-                  "scheduledDate": "2026-04-07",
-                  "scheduledTime": "14:00:00"
-                }
-                """;
+        TodoRequest request = createMonthlyRecurringTodoRequest();
         when(todoService.saveTodo(eq(memberId), any(TodoRequest.class))).thenReturn(todoId);
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.todoId").value(todoId));
     }
@@ -82,17 +82,12 @@ class TodoControllerWebMvcTest {
     @DisplayName("Todo 생성 요청 검증 실패 시 오류를 반환한다")
     void createTodoReturnsValidationError() throws Exception {
         Long memberId = 5L;
-        String requestBody = """
-                {
-                  "categoryId": 10,
-                  "title": ""
-                }
-                """;
+        TodoRequest request = createBlankTitleTodoRequest();
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.validationErrors.title").exists());
@@ -171,6 +166,41 @@ class TodoControllerWebMvcTest {
         );
     }
 
+    private TodoRequest createMonthlyRecurringTodoRequest() {
+        return new TodoRequest(
+                10L,
+                null,
+                "보고서 작성",
+                "초안부터 작성",
+                1,
+                LocalDateTime.of(2026, 4, 7, 18, 0),
+                LocalDate.of(2026, 5, 7),
+                LocalTime.of(14, 0),
+                new RecurrenceRuleRequest(
+                        Frequency.MONTHLY,
+                        1,
+                        new ByDayRequest(1, List.of(Day.MO)),
+                        null,
+                        null,
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
+        );
+    }
+
+    private TodoRequest createBlankTitleTodoRequest() {
+        return new TodoRequest(
+                10L,
+                null,
+                "",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+    }
+
     private TodoResponse response(Long todoId, String title) {
         return new TodoResponse(
                 todoId,
@@ -184,7 +214,15 @@ class TodoControllerWebMvcTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0),
-                null,
+                new RecurrenceRuleResponse(
+                        Frequency.MONTHLY,
+                        1,
+                        1,
+                        List.of(Day.MO),
+                        null,
+                        null,
+                        RecurrenceCriteria.SCHEDULED_DATE
+                ),
                 List.of(new TodoResponse(
                         30L,
                         todoId,

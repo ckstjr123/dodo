@@ -119,7 +119,8 @@ HAVING COUNT(m) > 5
 
 ## Implementation Guidance
 - Follow the CQS (Command Query Separation) principle so commands change state without returning query data, and queries do not mutate state.
-- Before coding application code, explain possible implementation options with their trade-offs and must wait for user approval.
+- Before modifying application code, explain the implementation options and trade-offs.  
+  must wait for explicit user approval; questions, reviews, discussions, or objections are not requests to edit files.
 - Use the defaults and built-in solutions recommended by the framework or library.
     ```java
     public interface UserRepository extends JpaRepository<User, Long> {

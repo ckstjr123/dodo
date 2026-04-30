@@ -48,16 +48,16 @@ public class TodoHistory {
 
     private TodoHistory(Long todoId, String title, Member member, LocalDateTime completedAt) {
         if (todoId == null) {
-            throw new IllegalArgumentException("Todo is required");
+            throw new IllegalArgumentException(TodoHistoryError.TODO_REQUIRED.message());
         }
         if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException("Todo title is required");
+            throw new IllegalArgumentException(TodoHistoryError.TODO_TITLE_REQUIRED.message());
         }
         if (member == null) {
-            throw new IllegalArgumentException("Member is required");
+            throw new IllegalArgumentException(TodoHistoryError.MEMBER_REQUIRED.message());
         }
         if (completedAt == null) {
-            throw new IllegalArgumentException("Completed at is required");
+            throw new IllegalArgumentException(TodoHistoryError.COMPLETED_AT_REQUIRED.message());
         }
 
         this.todoId = todoId;
@@ -69,7 +69,7 @@ public class TodoHistory {
     /** ?꾩옱 todo title???ъ슜???꾨즺 ?대젰???앹꽦?쒕떎. */
     public static TodoHistory create(Todo todo, LocalDateTime completedAt) {
         if (todo == null) {
-            throw new IllegalArgumentException("Todo is required");
+            throw new IllegalArgumentException(TodoHistoryError.TODO_REQUIRED.message());
         }
 
         return new TodoHistory(todo.getId(), todo.getTitle(), todo.getMember(), completedAt);

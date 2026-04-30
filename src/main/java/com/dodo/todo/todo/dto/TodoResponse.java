@@ -2,7 +2,6 @@ package com.dodo.todo.todo.dto;
 
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -20,7 +19,7 @@ public record TodoResponse(
         LocalDateTime dueAt,
         LocalDate scheduledDate,
         LocalTime scheduledTime,
-        RecurrenceRule recurrenceRule,
+        RecurrenceRuleResponse recurrenceRule,
         List<TodoResponse> subTodos
 ) {
 
@@ -37,7 +36,7 @@ public record TodoResponse(
                 todo.getDueAt(),
                 todo.getScheduledDate(),
                 todo.getScheduledTime(),
-                todo.getRecurrenceRule(),
+                RecurrenceRuleResponse.from(todo.getRecurrenceRule()),
                 todo.getSubTodos().stream()
                         .map(TodoResponse::from)
                         .toList()

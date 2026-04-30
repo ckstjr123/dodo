@@ -6,6 +6,7 @@ import com.dodo.todo.common.exception.ApiException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.todo.domain.Todo;
+import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
@@ -17,7 +18,6 @@ import com.dodo.todo.todo.repository.TodoRepository;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -72,8 +72,9 @@ public class TodoService {
     @Transactional
     public void completeTodo(Long memberId, Long todoId) {
         Todo todo = findTodoWithSubTodos(memberId, todoId);
-        todo.complete();
-        todoHistoryRepository.save(TodoHistory.create(todo, LocalDateTime.now()));
+        LocalDateTime completedAt = LocalDateTime.now();
+        todo.complete(completedAt);
+        todoHistoryRepository.save(TodoHistory.create(todo, completedAt));
     }
 
     @Transactional
@@ -84,10 +85,10 @@ public class TodoService {
 
     private Category findCategory(Member member, Long categoryId) {
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new ApiException("CATEGORY_NOT_FOUND", HttpStatus.NOT_FOUND, "Category not found"));
+                .orElseThrow(() -> toApiException(TodoError.CATEGORY_NOT_FOUND));
 
         if (!category.isOwnedBy(member)) {
-            throw new ApiException("CATEGORY_NOT_FOUND", HttpStatus.NOT_FOUND, "Category not found");
+            throw toApiException(TodoError.CATEGORY_NOT_FOUND);
         }
 
         return category;
@@ -99,10 +100,10 @@ public class TodoService {
         }
 
         Todo todo = todoRepository.findByIdAndMemberId(mainTodoId, memberId)
-                .orElseThrow(() -> new ApiException("TODO_NOT_FOUND", HttpStatus.NOT_FOUND, "Todo not found"));
+                .orElseThrow(() -> toApiException(TodoError.TODO_NOT_FOUND));
 
         if (todo.hasMainTodo()) {
-            throw new ApiException("TODO_DEPTH_LIMIT_EXCEEDED", HttpStatus.BAD_REQUEST, "Todo depth must not exceed 2");
+            throw toApiException(TodoError.TODO_DEPTH_LIMIT_EXCEEDED);
         }
 
         return todo;
@@ -110,6 +111,10 @@ public class TodoService {
 
     private Todo findTodoWithSubTodos(Long memberId, Long todoId) {
         return todoRepository.findWithSubTodos(todoId, memberId)
-                .orElseThrow(() -> new ApiException("TODO_NOT_FOUND", HttpStatus.NOT_FOUND, "Todo not found"));
+                .orElseThrow(() -> toApiException(TodoError.TODO_NOT_FOUND));
+    }
+
+    private ApiException toApiException(TodoError error) {
+        return new ApiException(error.code(), error.status(), error.message());
     }
 }
