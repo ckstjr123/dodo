@@ -23,7 +23,7 @@ public class RecurrenceRuleConverter implements AttributeConverter<RecurrenceRul
         try {
             return OBJECT_MAPPER.writeValueAsString(attribute);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Invalid recurrence rule", exception);
+            throw new IllegalArgumentException(RecurrenceRuleError.INVALID_RECURRENCE_RULE.message(), exception);
         }
     }
 
@@ -36,7 +36,7 @@ public class RecurrenceRuleConverter implements AttributeConverter<RecurrenceRul
         try {
             return OBJECT_MAPPER.readValue(dbData, RecurrenceRule.class);
         } catch (JsonProcessingException exception) {
-            throw new IllegalArgumentException("Invalid recurrence rule", exception);
+            throw new IllegalArgumentException(RecurrenceRuleError.INVALID_RECURRENCE_RULE.message(), exception);
         }
     }
 }

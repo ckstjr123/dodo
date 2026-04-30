@@ -2,24 +2,25 @@ package com.dodo.todo.todo.domain;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
-import com.dodo.todo.todo.domain.recurrence.WeekDays;
+import com.dodo.todo.todo.domain.recurrence.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
-import net.fortuna.ical4j.model.WeekDay;
 
 import static com.dodo.todo.util.TestFixture.createRecurringTodo;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class TodoTest {
+
+    private static final LocalDateTime COMPLETED_AT = LocalDateTime.of(2026, 4, 10, 12, 0);
 
     @Test
     @DisplayName("다른 회원의 Todo면 소유자가 아니다")
@@ -75,7 +76,7 @@ class TodoTest {
                 .status(TodoStatus.TODO)
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Main todo must belong to the same member");
+                .hasMessage(TodoError.MAIN_TODO_NOT_OWNED.message());
     }
 
     @Test
@@ -83,7 +84,7 @@ class TodoTest {
     void completeNormalTodo() {
         Todo todo = todo(Member.of("member@example.com"));
 
-        todo.complete();
+        todo.complete(COMPLETED_AT);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.DONE);
     }
@@ -100,9 +101,9 @@ class TodoTest {
                 .status(TodoStatus.DONE)
                 .build();
 
-        assertThatThrownBy(todo::complete)
+        assertThatThrownBy(() -> todo.complete(COMPLETED_AT))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Todo already completed");
+                .hasMessage(TodoError.TODO_ALREADY_COMPLETED.message());
     }
 
     @Test
@@ -116,10 +117,10 @@ class TodoTest {
                 .category(category)
                 .title("recurring")
                 .status(TodoStatus.TODO)
-                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null))
+                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE))
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("Scheduled date is required for recurring todo");
+                .hasMessage(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
     }
 
     @Test
@@ -135,13 +136,80 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.from(List.of(WeekDay.FR)), null, null)
+                new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.of(0, List.of(Day.FR)), null, null, RecurrenceCriteria.SCHEDULED_DATE)
         );
 
-        todo.complete();
+        todo.complete(COMPLETED_AT);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
         assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate.with(TemporalAdjusters.next(DayOfWeek.FRIDAY)));
+        assertThat(todo.getCompletedAt()).isEqualTo(COMPLETED_AT);
+    }
+
+    @Test
+    @DisplayName("완료일 기준 반복 Todo는 완료일을 기준으로 다음 스케줄로 이동한다")
+    void completeRecurringTodoByCompletedDateCriteria() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 28);
+        LocalDateTime completedAt = LocalDateTime.of(2026, 4, 30, 12, 0);
+        Todo todo = createRecurringTodo(
+                1L,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.COMPLETED_DATE)
+        );
+
+        todo.complete(completedAt);
+
+        assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(todo.getScheduledDate()).isEqualTo(completedAt.toLocalDate().plusDays(1));
+        assertThat(todo.getCompletedAt()).isEqualTo(completedAt);
+    }
+
+    @Test
+    @DisplayName("완료일 기준 반복 Todo는 예정일 전에는 완료할 수 없다")
+    void rejectCompleteCompletedDateCriteriaTodoBeforeScheduledDate() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo todo = createRecurringTodo(
+                1L,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                LocalDate.of(2026, 4, 30),
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.COMPLETED_DATE)
+        );
+
+        assertThatThrownBy(() -> todo.complete(LocalDateTime.of(2026, 4, 29, 12, 0)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(RecurrenceRuleError.COMPLETION_BEFORE_SCHEDULED_DATE.message());
+    }
+
+    @Test
+    @DisplayName("예정일 기준 반복 Todo는 예정일 전에도 완료할 수 있다")
+    void completeScheduledDateCriteriaTodoBeforeScheduledDate() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 30);
+        Todo todo = createRecurringTodo(
+                1L,
+                member,
+                category,
+                "recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+        );
+
+        todo.complete(LocalDateTime.of(2026, 4, 29, 12, 0));
+
+        assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate.plusDays(1));
     }
 
     @Test
@@ -157,10 +225,10 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until)
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until, RecurrenceCriteria.SCHEDULED_DATE)
         );
 
-        todo.complete();
+        todo.complete(COMPLETED_AT);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.DONE);
         assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate);
@@ -168,7 +236,7 @@ class TodoTest {
 
     @Test
     @DisplayName("메인 Todo를 완료하면 하위 작업도 함께 완료된다")
-    void completeMainTodoCompletesRecurringSubTodo() {
+    void completeMainTodoCompletesSubTodo() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "work");
         Todo mainTodo = Todo.builder()
@@ -185,35 +253,109 @@ class TodoTest {
                 "sub recurring",
                 TodoStatus.TODO,
                 LocalDate.of(2026, 4, 7),
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null)
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
         );
-        ReflectionTestUtils.setField(subTodo, "mainTodo", mainTodo);
         setSubTodos(mainTodo, subTodo);
 
-        mainTodo.complete();
+        mainTodo.complete(COMPLETED_AT);
 
         assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.DONE);
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.DONE);
+        assertThat(mainTodo.getCompletedAt()).isEqualTo(COMPLETED_AT);
+        assertThat(subTodo.getCompletedAt()).isEqualTo(COMPLETED_AT);
     }
 
     @Test
-    @DisplayName("영구 완료된 반복 Todo도 TODO 상태로 복구할 수 있다")
-    void undoRecurringDoneTodo() {
+    @DisplayName("반복 메인 Todo를 완료해 다음 일정으로 이동하면 하위 작업은 TODO로 초기화된다")
+    void completeRecurringMainTodoResetsSubTodosWhenNextDateExists() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "work");
-        Todo todo = createRecurringTodo(
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 7);
+        Todo mainTodo = createRecurringTodo(
                 1L,
                 member,
                 category,
-                "recurring",
-                TodoStatus.DONE,
-                LocalDate.of(2026, 4, 10),
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 5, 10))
+                "main recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
         );
+        Todo subTodo = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(mainTodo)
+                .title("sub")
+                .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
+                .build();
+        setSubTodos(mainTodo, subTodo);
+
+        mainTodo.complete(COMPLETED_AT);
+
+        assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(mainTodo.getScheduledDate()).isEqualTo(scheduledDate.plusDays(1));
+        assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(subTodo.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("반복 메인 Todo가 영구 완료되면 하위 작업도 함께 완료된다")
+    void completeRecurringMainTodoCompletesSubTodosWhenNextDateDoesNotExist() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        LocalDate scheduledDate = LocalDate.of(2026, 4, 10);
+        Todo mainTodo = createRecurringTodo(
+                1L,
+                member,
+                category,
+                "main recurring",
+                TodoStatus.TODO,
+                scheduledDate,
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, scheduledDate, RecurrenceCriteria.SCHEDULED_DATE)
+        );
+        Todo subTodo = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(mainTodo)
+                .title("sub")
+                .status(TodoStatus.TODO)
+                .build();
+        setSubTodos(mainTodo, subTodo);
+
+        mainTodo.complete(COMPLETED_AT);
+
+        assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.DONE);
+        assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.DONE);
+        assertThat(mainTodo.getCompletedAt()).isEqualTo(COMPLETED_AT);
+        assertThat(subTodo.getCompletedAt()).isEqualTo(COMPLETED_AT);
+    }
+
+    @Test
+    @DisplayName("영구 완료된 반복 Todo를 TODO 상태로 복구할 수 있다")
+    void undoRecurringDoneTodo() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("recurring")
+                .status(TodoStatus.DONE)
+                .scheduledDate(LocalDate.of(2026, 4, 10))
+                .completedAt(COMPLETED_AT)
+                .recurrenceRule(new RecurrenceRule(
+                        Frequency.DAILY,
+                        1,
+                        WeekDays.empty(),
+                        null,
+                        LocalDate.of(2026, 4, 10),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                ))
+                .build();
 
         todo.undo();
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(todo.getCompletedAt()).isNull();
     }
 
     @Test
@@ -226,6 +368,7 @@ class TodoTest {
                 .category(category)
                 .title("main")
                 .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
                 .build();
         Todo subTodo = Todo.builder()
                 .member(member)
@@ -233,6 +376,7 @@ class TodoTest {
                 .mainTodo(mainTodo)
                 .title("sub")
                 .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
                 .build();
         setSubTodos(mainTodo, subTodo);
 
@@ -240,6 +384,50 @@ class TodoTest {
 
         assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.TODO);
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+        assertThat(mainTodo.getCompletedAt()).isNull();
+        assertThat(subTodo.getCompletedAt()).isNull();
+    }
+
+    @Test
+    @DisplayName("완료된 하위 Todo를 완료 취소하면 메인 Todo도 TODO로 복구하고 다른 하위 작업은 유지한다")
+    void undoDoneSubTodoRestoresMainTodoOnly() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo mainTodo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("main")
+                .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
+                .build();
+        Todo subTodo1 = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(mainTodo)
+                .title("sub")
+                .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
+                .build();
+        Todo subTodo2 = Todo.builder()
+                .member(member)
+                .category(category)
+                .mainTodo(mainTodo)
+                .title("sibling")
+                .status(TodoStatus.DONE)
+                .completedAt(COMPLETED_AT)
+                .build();
+        setSubTodos(mainTodo, subTodo1, subTodo2);
+
+        subTodo1.undo();
+
+        assertAll(
+                () -> assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.TODO),
+                () -> assertThat(mainTodo.getCompletedAt()).isNull(),
+                () -> assertThat(subTodo1.getStatus()).isEqualTo(TodoStatus.TODO),
+                () -> assertThat(subTodo1.getCompletedAt()).isNull(),
+                () -> assertThat(subTodo2.getStatus()).isEqualTo(TodoStatus.DONE),
+                () -> assertThat(subTodo2.getCompletedAt()).isEqualTo(COMPLETED_AT)
+        );
     }
 
     @Test
@@ -249,7 +437,7 @@ class TodoTest {
 
         assertThatThrownBy(todo::undo)
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessage("Todo is not completed");
+                .hasMessage(TodoError.TODO_NOT_COMPLETED.message());
     }
 
     private Todo todo(Member member) {

@@ -5,31 +5,20 @@ import com.dodo.todo.common.entity.BaseEntity;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRuleConverter;
-import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.OrderBy;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import org.hibernate.annotations.BatchSize;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import lombok.AccessLevel;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.hibernate.annotations.BatchSize;
+import java.util.Optional;
 
 @Getter
 @Entity
@@ -80,6 +69,9 @@ public class Todo extends BaseEntity {
     @Column(name = "scheduled_time")
     private LocalTime scheduledTime;
 
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
     @Convert(converter = RecurrenceRuleConverter.class)
     @Column(name = "recurrence_rule", columnDefinition = "json")
     private RecurrenceRule recurrenceRule;
@@ -96,14 +88,13 @@ public class Todo extends BaseEntity {
             LocalDateTime dueAt,
             LocalDate scheduledDate,
             LocalTime scheduledTime,
+            LocalDateTime completedAt,
             RecurrenceRule recurrenceRule
     ) {
-        validateMember(member);
-        validateCategory(category);
-        validateStatus(status);
         if (mainTodo != null && !mainTodo.isOwnedBy(member)) {
-            throw new IllegalArgumentException("Main todo must belong to the same member");
+            throw new IllegalArgumentException(TodoError.MAIN_TODO_NOT_OWNED.message());
         }
+        validateStatus(status);
         validateRecurrenceSchedule(recurrenceRule, scheduledDate);
         this.member = member;
         this.category = category;
@@ -115,6 +106,7 @@ public class Todo extends BaseEntity {
         this.dueAt = dueAt;
         this.scheduledDate = scheduledDate;
         this.scheduledTime = scheduledTime;
+        this.completedAt = completedAt;
         this.recurrenceRule = recurrenceRule;
     }
 
@@ -123,7 +115,7 @@ public class Todo extends BaseEntity {
     }
 
     public Long getMainTodoId() {
-        return mainTodo == null ? null : mainTodo.getId();
+        return mainTodo != null ? mainTodo.getId() : null;
     }
 
     public boolean isOwnedBy(Member member) {
@@ -152,61 +144,87 @@ public class Todo extends BaseEntity {
     /**
      * 완료 처리한다.
      * 반복 Todo는 다음 반복일이 있으면 scheduledDate를 이동하고, 없으면 DONE으로 변경한다.
-     * mainTodo를 완료하면 subTodo도 함께 DONE으로 변경한다.
+     * 반복 mainTodo의 다음 회차가 있으면 subTodo를 TODO로 초기화하고, 영구 완료되면 함께 DONE으로 변경한다.
      */
-    public void complete() {
+    public void complete(LocalDateTime completedAt) {
         if (status == TodoStatus.DONE) {
-            throw new IllegalStateException("Todo already completed");
+            throw new IllegalStateException(TodoError.TODO_ALREADY_COMPLETED.message());
+        }
+        if (completedAt == null) {
+            throw new IllegalArgumentException(TodoError.COMPLETED_DATE_REQUIRED.message());
         }
 
-        if (isRecurringTodo()) {
-            LocalDate nextScheduledDate = recurrenceRule.nextDate(scheduledDate);
-            if (nextScheduledDate == null) {
-                status = TodoStatus.DONE;
-            } else {
-                scheduledDate = nextScheduledDate;
-            }
-        } else {
-            status = TodoStatus.DONE;
-        }
+        Optional<LocalDate> nextDateOpt = nextDateAfterCompletion(completedAt);
+        nextDateOpt.ifPresentOrElse(
+                nextDate -> {
+                    scheduledDate = nextDate;
+                    resetSubTodos();
+                },
+                () -> {
+                    setStatus(TodoStatus.DONE);
+                    doneSubTodos(completedAt);
+                }
+        );
 
-        subTodos.forEach(subTodo -> subTodo.status = TodoStatus.DONE);
+        this.completedAt = completedAt;
     }
+
+    private Optional<LocalDate> nextDateAfterCompletion(LocalDateTime completedAt) {
+        if (!isRecurringTodo()) {
+            return Optional.empty();
+        }
+
+        return recurrenceRule.nextDate(scheduledDate, completedAt.toLocalDate());
+    }
+
 
     /**
      * 완료를 취소한다.
-     * mainTodo를 복구하면 subTodo도 함께 TODO로 복구한다.
+     * mainTodo를 복구하면 subTodo도 함께 TODO로 복구하고, subTodo를 복구하면 mainTodo도 TODO로 복구한다.
      */
     public void undo() {
         if (status != TodoStatus.DONE) {
-            throw new IllegalStateException("Todo is not completed");
+            throw new IllegalStateException(TodoError.TODO_NOT_COMPLETED.message());
         }
 
-        status = TodoStatus.TODO;
-        subTodos.forEach(subTodo -> subTodo.status = TodoStatus.TODO);
+        setStatus(TodoStatus.TODO);
+        completedAt = null;
+        if (hasMainTodo()) {
+            mainTodo.setStatus(TodoStatus.TODO);
+            mainTodo.completedAt = null;
+            return;
+        }
+
+        resetSubTodos();
     }
 
-    private void validateMember(Member member) {
-        if (member == null) {
-            throw new IllegalArgumentException("Member is required");
-        }
+    private void setStatus(TodoStatus todoStatus) {
+        this.status = todoStatus;
     }
 
-    private void validateCategory(Category category) {
-        if (category == null) {
-            throw new IllegalArgumentException("Category is required");
-        }
+    private void doneSubTodos(LocalDateTime completedAt) {
+        subTodos.forEach(subTodo -> {
+            subTodo.setStatus(TodoStatus.DONE);
+            subTodo.completedAt = completedAt;
+        });
+    }
+
+    private void resetSubTodos() {
+        subTodos.forEach(subTodo -> {
+            subTodo.setStatus(TodoStatus.TODO);
+            subTodo.completedAt = null;
+        });
     }
 
     private void validateStatus(TodoStatus status) {
         if (status == null) {
-            throw new IllegalArgumentException("Todo status is required");
+            throw new IllegalArgumentException(TodoError.TODO_STATUS_REQUIRED.message());
         }
     }
 
     private void validateRecurrenceSchedule(RecurrenceRule recurrenceRule, LocalDate scheduledDate) {
         if (recurrenceRule != null && scheduledDate == null) {
-            throw new IllegalArgumentException("Scheduled date is required for recurring todo");
+            throw new IllegalArgumentException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
         }
     }
 }

@@ -61,8 +61,15 @@ public final class TestFixture {
         return todo;
     }
 
-    public static Todo createSubTodo(Member member, Category category, Todo mainTodo, String title, Long id) {
-        Todo todo = createTodo(member, category, mainTodo, title, TodoStatus.TODO, null);
+    public static Todo createSubTodo(
+            Member member,
+            Category category,
+            Todo mainTodo,
+            String title,
+            TodoStatus status,
+            Long id
+    ) {
+        Todo todo = createTodo(member, category, mainTodo, title, status, null);
         setId(todo, id);
         return todo;
     }

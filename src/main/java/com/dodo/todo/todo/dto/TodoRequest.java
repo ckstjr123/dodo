@@ -2,6 +2,7 @@ package com.dodo.todo.todo.dto;
 
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -26,6 +27,7 @@ public record TodoRequest(
 
         LocalDateTime dueAt,
 
+        @FutureOrPresent
         LocalDate scheduledDate,
 
         LocalTime scheduledTime,

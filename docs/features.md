@@ -9,6 +9,7 @@
 - 메인 목록은 `TODO` 상태의 루트 Todo만 조회한다.
 - 일반 Todo 완료 시 `DONE` 상태가 되고 메인 목록에서 제외된다.
 - 반복 Todo는 완료 후 다음 반복일이 있으면 `scheduledDate`를 이동시키고 다음 반복일이 없으면 `DONE` 상태가 된다.
+- Todo는 마지막 완료 시각인 `completedAt`을 가진다.
 - 태그 기능과 priority 기능은 사용하지 않는다.
 - 응답 DTO의 식별자 필드는 엔티티명을 포함한 형식(`todoId`, `memberId`, `historyId`)으로 통일한다.
 
@@ -36,58 +37,84 @@
 
 지원 필드:
 
-- `freq`
+- `frequency`
 - `interval`
 - `byDay`
+  - `offset`
+  - `days`
 - `byMonthDay`
 - `until`
+- `criteria`
 
 지원 규칙:
 
-- Daily: `{ "freq": "DAILY", "interval": 1 }`
-- Weekly: `{ "freq": "WEEKLY", "interval": 1, "byDay": ["MO", "WE"] }`
-- Monthly 고정일: `{ "freq": "MONTHLY", "interval": 1, "byMonthDay": 31 }`
-- Monthly n주차 요일: `{ "freq": "MONTHLY", "interval": 1, "byDay": ["4FR"] }`
+- Daily: `{ "frequency": "DAILY", "interval": 1 }`
+- Weekly: `{ "frequency": "WEEKLY", "interval": 1, "byDay": { "days": ["MO", "WE"] } }`
+- Monthly 고정일: `{ "frequency": "MONTHLY", "interval": 1, "byMonthDay": 31 }`
+- Monthly 특정 주차 특정 요일: `{ "frequency": "MONTHLY", "interval": 1, "byDay": { "offset": 2, "days": ["MO"] } }`
 - `interval`은 1 이상 정수다.
-- `byDay`와 `byMonthDay`는 동시에 사용할 수 없다.
-- Weekly `byDay`는 `MO`~`SU`만 허용한다.
-- Monthly `byDay`는 `1MO`~`5SU`만 허용한다.
+- API에서 `byDay`와 `byMonthDay` 동시 사용은 허용하지 않는다.
+- Java 값 객체인 `RecurrenceRule`은 단순 저장 모델로 `byDay`, `byMonthDay`를 모두 필드로 가지며, API 요청 제약은 `RecurrenceRuleRequest`에서 검증한다.
+- `byDay.days`는 `MO`~`SU`만 허용한다.
+- Weekly `byDay`는 `offset`을 사용할 수 없다.
+- Monthly `byDay`는 `offset` 1~5와 `MO`~`SU` 조합만 허용한다.
+- 하나의 Monthly 요일 반복은 특정 주차의 특정 요일 하나만 가질 수 있다. 예를 들어 2주차 월요일은 가능하지만, 2주차 월/화 또는 2주차 월과 3주차 화를 하나의 반복 규칙에 함께 담을 수 없다.
 - Monthly `byMonthDay`는 1~31 사이 값만 허용한다.
+- `criteria`는 다음 반복일 계산 기준이며 `SCHEDULED_DATE`, `COMPLETED_DATE`를 지원한다.
+- `criteria`를 생략하면 `SCHEDULED_DATE`로 처리한다.
+
+반복 기준:
+
+- `SCHEDULED_DATE`는 현재 `scheduledDate`를 기준으로 다음 반복일을 계산한다.
+- `COMPLETED_DATE`는 실제 완료일인 `completedAt.toLocalDate()`를 기준으로 다음 반복일을 계산한다.
+- `scheduledDate`는 생성 시 첫 예정일이며, 완료 후에는 현재 또는 다음 회차 예정일로 갱신된다.
+- `COMPLETED_DATE` 기준 반복은 `scheduledDate`가 오늘보다 미래이면 완료할 수 없다.
+- `SCHEDULED_DATE` 기준 반복은 기존 동작을 유지하며 미래 `scheduledDate`도 완료할 수 있다.
 
 월 반복 보정:
 
 - `byMonthDay=31`에서 해당 월에 31일이 없으면 말일로 보정한다.
 - 다음 월 계산 시 현재 `dayOfMonth`가 아니라 원래 `byMonthDay` 기준으로 계산해 드리프트가 발생하지 않도록 한다.
-- `byDay=5FR`에서 해당 월에 5번째 금요일이 없으면 마지막 금요일로 보정한다.
+- `byDay={ "offset": 5, "days": ["FR"] }`에서 해당 월에 5번째 금요일이 없으면 마지막 금요일로 보정한다.
 
 종료일 규칙:
 
-- `nextDate()`는 다음 반복 후보가 없거나 종료일을 넘으면 `null`을 반환한다.
-- 주/일 반복은 ical4j의 `getNextDate(...)` 결과가 `null`이면 반복 종료로 본다.
-- 월 반복은 계산된 다음 후보 날짜가 `until` 이후면 `null`을 반환한다.
+- `nextDate()`는 다음 반복 후보가 없거나 종료일을 넘으면 `Optional.empty()`를 반환한다.
+- 주/일 반복은 ical4j의 `getNextDate(...)` 결과가 `null`이면 반복 종료로 보고 `Optional.empty()`를 반환한다.
+- 월 반복은 계산된 다음 후보 날짜가 `until` 이후면 `Optional.empty()`를 반환한다.
 
 ## Complete
 
 - 일반 Todo 완료 시 `TodoHistory`를 생성하고 Todo 상태를 `DONE`으로 변경한다.
 - 반복 Todo 완료 시 `TodoHistory`를 생성한다.
+- Todo 완료 시 `completedAt`을 완료 시각으로 설정한다.
 - 반복 Todo 완료 시 `nextDate()`가 값을 반환하면 `scheduledDate`를 그 날짜로 이동한다.
-- 반복 Todo 완료 시 `nextDate()`가 `null`이면 `DONE`으로 변경한다.
+- 반복 Todo 완료 시 `nextDate()`가 `Optional.empty()`이면 `DONE`으로 변경한다.
+- 다음 반복일이 있는 반복 Todo는 `status=TODO`를 유지하고 `completedAt`은 마지막 완료 시각으로 유지한다.
 - 반복 Todo 완료 여부와 관계없이 Todo를 생성하지 않는다.
+- Todo 완료 시 완료 API를 호출한 기준 Todo에 대해서 `TodoHistory`를 단건 생성한다.
 - 이미 `DONE`인 Todo를 다시 완료할 수 없다.
-- `undo`는 `DONE` 상태를 `TODO`로 복구한다.
+- `undo`는 `DONE` 상태를 `TODO`로 복구하고 `completedAt`을 초기화한다.
 - 이미 `TODO`인 Todo는 `undo`할 수 없다.
 
 ## SubTodos
 
-- mainTodo를 완료하면 subTodo도 함께 `DONE`으로 변경한다.
-- mainTodo를 undo하면 subTodo도 함께 `TODO`로 복구한다.
+- 일반 mainTodo를 완료하면 subTodo도 함께 `DONE`으로 변경한다.
+- mainTodo 영구 완료로 subTodo도 함께 완료되면 subTodo의 `completedAt`도 같은 완료 시각으로 설정한다.
+- 반복 mainTodo를 완료했을 때 다음 반복일이 있으면 mainTodo의 `scheduledDate`를 이동하고 subTodo는 모두 `TODO`로 초기화한다.
+- 반복 mainTodo의 다음 반복일이 있어 subTodo를 `TODO`로 초기화하면 subTodo의 `completedAt`도 초기화한다.
+- 반복 mainTodo를 완료했을 때 다음 반복일이 없으면 mainTodo와 subTodo를 함께 `DONE`으로 변경한다.
+- mainTodo를 undo하면 mainTodo와 subTodo를 모두 `TODO`로 초기화한다.
+- subTodo를 undo하면 해당 subTodo와 mainTodo를 `TODO`로 복구하고, 다른 subTodo 상태는 변경하지 않는다.
 - 개별 하위 Todo의 반복 규칙은 별도로 독립적이다.
-- 다만 mainTodo 완료 시 subTodo의 반복 여부와 관계없이 함께 종료한다.
+- mainTodo가 영구 완료되는 경우 subTodo의 반복 여부와 관계없이 함께 종료한다.
 
 ## Todo History
 
 - `TodoHistory`는 완료 이력을 표현한다.
 - `TodoHistory`는 `todoId`를 저장하고, 완료 당시 `title`을 별도로 저장한다.
+- 완료 API를 호출한 Todo에 대해서 완료 이력을 남긴다.
+- mainTodo 영구 완료로 subTodo가 함께 완료되어도 subTodo별 완료 이력은 별도로 저장하지 않는다.
 - history는 반복 여부를 구분하지 않는다.
 - history 조회는 최대 30건씩 조회한다.
 - history 조회는 커서 기반 페이징을 사용한다.

@@ -14,7 +14,7 @@ public interface TodoHistoryRepository extends JpaRepository<TodoHistory, Long> 
             SELECT history
             FROM TodoHistory history
             WHERE history.member.id = :memberId
-              and (:parentTodoId is null or history.parentTodoId = :parentTodoId)
+              and (:todoId is null or history.todoId = :todoId)
               and (
                     :cursorCompletedAt is null
                     or history.completedAt < :cursorCompletedAt
@@ -24,7 +24,7 @@ public interface TodoHistoryRepository extends JpaRepository<TodoHistory, Long> 
             """)
     Slice<TodoHistory> findHistories(
             @Param("memberId") Long memberId,
-            @Param("parentTodoId") Long todoId,
+            @Param("todoId") Long todoId,
             @Param("cursorCompletedAt") LocalDateTime cursorCompletedAt,
             @Param("cursorId") Long cursorId,
             Pageable pageable
