@@ -2,7 +2,7 @@ package com.dodo.todo.todo.service;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.category.repository.CategoryRepository;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.todo.domain.Todo;
@@ -114,7 +114,7 @@ public class TodoService {
                 .orElseThrow(() -> toApiException(TodoError.TODO_NOT_FOUND));
     }
 
-    private ApiException toApiException(TodoError error) {
-        return new ApiException(error.code(), error.status(), error.message());
+    private BusinessException toApiException(TodoError error) {
+        return new BusinessException(error.code(), error.status(), error.message());
     }
 }

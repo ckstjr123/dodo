@@ -2,7 +2,7 @@ package com.dodo.todo.todo.service;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.category.repository.CategoryRepository;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.todo.domain.Todo;
@@ -68,7 +68,7 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
 
         assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, null, null)))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.CATEGORY_NOT_FOUND.message());
     }
 
@@ -107,7 +107,7 @@ class TodoServiceTest {
         when(todoRepository.findByIdAndMemberId(mainTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
         assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, mainTodoId, null)))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.TODO_DEPTH_LIMIT_EXCEEDED.message());
     }
 

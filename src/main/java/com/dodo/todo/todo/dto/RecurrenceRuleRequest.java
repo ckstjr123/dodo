@@ -1,6 +1,6 @@
 package com.dodo.todo.todo.dto;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
@@ -80,7 +80,7 @@ public record RecurrenceRuleRequest(
     }
 
     private void throwValidationError(RecurrenceRuleRequestError error) {
-        throw new ApiException(error.code(), error.status(), error.message());
+        throw new BusinessException(error.code(), error.status(), error.message());
     }
 
     private boolean hasByDay() {

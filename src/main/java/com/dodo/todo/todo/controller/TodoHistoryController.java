@@ -1,7 +1,7 @@
 package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.dto.TodoHistoryListResponse;
@@ -40,7 +40,7 @@ public class TodoHistoryController implements TodoHistoryApiDocs {
             @RequestParam(defaultValue = "30") Integer size
     ) {
         if ((cursorCompletedAt == null) != (cursorId == null)) {
-            throw new ApiException(
+            throw new BusinessException(
                     TodoError.INVALID_CURSOR.code(),
                     TodoError.INVALID_CURSOR.status(),
                     TodoError.INVALID_CURSOR.message()

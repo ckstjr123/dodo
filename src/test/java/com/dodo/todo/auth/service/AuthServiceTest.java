@@ -19,7 +19,7 @@ import com.dodo.todo.auth.repository.RefreshTokenRepository;
 import com.dodo.todo.auth.social.client.OAuthClients;
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import java.time.LocalDateTime;
@@ -114,7 +114,7 @@ class AuthServiceTest {
                 .thenReturn(userInfo);
 
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
     }
 
@@ -129,7 +129,7 @@ class AuthServiceTest {
         );
 
         assertThatThrownBy(() -> authService.login(request))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
     }
 
@@ -169,7 +169,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
     }
 
@@ -189,7 +189,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByToken(refreshToken)).thenReturn(Optional.of(expiredRefreshToken));
 
         assertThatThrownBy(() -> authService.refresh(new RefreshTokenRequest(refreshToken)))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
         verify(refreshTokenRepository).delete(expiredRefreshToken);
     }
@@ -223,7 +223,7 @@ class AuthServiceTest {
         when(memberRepository.findById(missingMemberId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.getCurrentMember(missingMemberId))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
     }
 

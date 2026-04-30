@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import java.util.Optional;
@@ -47,7 +47,7 @@ class MemberServiceTest {
         when(memberRepository.findById(missingMemberId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> memberService.findById(missingMemberId))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
     }
 }
