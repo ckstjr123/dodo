@@ -2,7 +2,7 @@ package com.dodo.todo.todo.dto;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.todo.domain.recurrence.Day;
 import com.dodo.todo.todo.domain.recurrence.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
@@ -25,7 +25,7 @@ class RecurrenceRuleRequestTest {
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(RecurrenceRuleRequestError.DAILY_DETAIL_VALUES.message());
     }
 
@@ -42,7 +42,7 @@ class RecurrenceRuleRequestTest {
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(RecurrenceRuleRequestError.WEEKLY_OFFSET_NOT_ALLOWED.message());
     }
 
@@ -59,7 +59,7 @@ class RecurrenceRuleRequestTest {
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(RecurrenceRuleRequestError.MONTHLY_BY_DAY_SINGLE_DAY_REQUIRED.message());
     }
 
@@ -76,7 +76,7 @@ class RecurrenceRuleRequestTest {
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(RecurrenceRuleRequestError.BY_DAY_AND_BY_MONTH_DAY_TOGETHER.message());
     }
 }

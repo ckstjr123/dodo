@@ -15,7 +15,7 @@
 
 ## Todo Create
 
-- 생성 요청 필드: `categoryId`, `mainTodoId`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrenceRule`
+- 생성 요청 필드: `categoryId`, `parentTodoId(mainTodoId)`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrenceRule`
 - `categoryId`, `title`은 필수다.
 - `title` 최대 길이는 200자다.
 - `memo` 최대 길이는 1000자다.

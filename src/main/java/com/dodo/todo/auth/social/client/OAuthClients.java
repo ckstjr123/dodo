@@ -2,7 +2,7 @@ package com.dodo.todo.auth.social.client;
 
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -21,7 +21,7 @@ public class OAuthClients {
         OAuthClient client = clients.stream()
                 .filter(oAuthClient -> oAuthClient.supports(provider))
                 .findFirst()
-                .orElseThrow(() -> new ApiException(
+                .orElseThrow(() -> new BusinessException(
                         "UNSUPPORTED_SOCIAL_PROVIDER",
                         HttpStatus.BAD_REQUEST,
                         "Unsupported social provider"

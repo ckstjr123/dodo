@@ -1,6 +1,6 @@
 package com.dodo.todo.auth.social.domain;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import java.util.Arrays;
 import org.springframework.http.HttpStatus;
 
@@ -11,7 +11,7 @@ public enum SocialProvider {
         return Arrays.stream(values())
                 .filter(value -> value.name().equalsIgnoreCase(provider))
                 .findFirst()
-                .orElseThrow(() -> new ApiException(
+                .orElseThrow(() -> new BusinessException(
                         "UNSUPPORTED_SOCIAL_PROVIDER",
                         HttpStatus.BAD_REQUEST,
                         "Unsupported social provider"

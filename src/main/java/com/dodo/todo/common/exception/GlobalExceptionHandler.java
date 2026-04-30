@@ -21,8 +21,8 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of("INTERNAL_SERVER_ERROR", "Unexpected server error"));
     }
 
-    @ExceptionHandler(ApiException.class)
-    public ResponseEntity<ErrorResponse> handleApiException(ApiException exception) {
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<ErrorResponse> handleApiException(BusinessException exception) {
         log.error("Unhandled exception occurred", exception);
         return ResponseEntity.status(exception.getStatus())
                 .body(ErrorResponse.of(exception.getCode(), exception.getMessage()));

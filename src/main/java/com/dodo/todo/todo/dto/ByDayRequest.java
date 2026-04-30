@@ -1,6 +1,6 @@
 package com.dodo.todo.todo.dto;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.todo.domain.recurrence.Day;
 import com.dodo.todo.todo.domain.recurrence.WeekDays;
 import jakarta.validation.constraints.NotEmpty;
@@ -44,6 +44,6 @@ public record ByDayRequest(
     }
 
     private void throwValidationError(RecurrenceRuleRequestError error) {
-        throw new ApiException(error.code(), error.status(), error.message());
+        throw new BusinessException(error.code(), error.status(), error.message());
     }
 }

@@ -11,7 +11,7 @@ import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.auth.social.client.OAuthClients;
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import java.time.LocalDateTime;
@@ -43,16 +43,16 @@ public class AuthService {
     @Transactional
     public TokenResponse refresh(RefreshTokenRequest request) {
         if (!jwtTokenProvider.isValidRefreshToken(request.refreshToken())) {
-            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+            throw new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
 
         RefreshToken storedRefreshToken = refreshTokenRepository.findByToken(request.refreshToken())
-                .orElseThrow(() -> new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid"));
+                .orElseThrow(() -> new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid"));
         LocalDateTime now = LocalDateTime.now();
 
         if (storedRefreshToken.isExpired(now)) {
             refreshTokenRepository.delete(storedRefreshToken);
-            throw new ApiException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+            throw new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
         }
 
         Long memberId = storedRefreshToken.getMemberId();
@@ -72,7 +72,7 @@ public class AuthService {
     @Transactional(readOnly = true)
     public MemberResponse getCurrentMember(Long memberId) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
+                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
 
         return new MemberResponse(member.getId(), member.getEmail());
     }
@@ -100,7 +100,7 @@ public class AuthService {
 
     private void validateOAuthUserInfo(OAuthUserInfo userInfo) {
         if (userInfo.providerUserId() == null || userInfo.providerUserId().isBlank()) {
-            throw new ApiException(
+            throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
                     HttpStatus.UNAUTHORIZED,
                     "Social account id is missing"
@@ -108,7 +108,7 @@ public class AuthService {
         }
 
         if (userInfo.email() == null || userInfo.email().isBlank()) {
-            throw new ApiException(
+            throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
                     HttpStatus.UNAUTHORIZED,
                     "Social account email is missing"
@@ -116,7 +116,7 @@ public class AuthService {
         }
 
         if (!userInfo.emailVerified()) {
-            throw new ApiException(
+            throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
                     HttpStatus.UNAUTHORIZED,
                     "Social account email is not verified"

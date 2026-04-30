@@ -6,7 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,7 +56,7 @@ class OAuthClientsTest {
                 "google-code",
                 "http://localhost:5173/auth/callback"
         ))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage("Unsupported social provider");
     }
 }

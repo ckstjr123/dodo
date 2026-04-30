@@ -1,6 +1,6 @@
 package com.dodo.todo.member.service;
 
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +21,6 @@ public class MemberService {
     @Transactional(readOnly = true)
     public Member findById(Long memberId) {
         return memberRepository.findById(memberId)
-                .orElseThrow(() -> new ApiException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
+                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
     }
 }

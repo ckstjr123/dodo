@@ -1,7 +1,7 @@
 package com.dodo.todo.auth.resolver;
 
 import com.dodo.todo.auth.principal.MemberPrincipal;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -35,7 +35,7 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken
                 || !(authentication.getPrincipal() instanceof MemberPrincipal memberPrincipal)) {
-            throw new ApiException("UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "Authentication is required");
+            throw new BusinessException("UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "Authentication is required");
         }
 
         return memberPrincipal.getId();

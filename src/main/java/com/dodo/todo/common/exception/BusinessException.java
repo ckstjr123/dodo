@@ -2,12 +2,12 @@ package com.dodo.todo.common.exception;
 
 import org.springframework.http.HttpStatus;
 
-public class ApiException extends RuntimeException {
+public class BusinessException extends RuntimeException {
 
     private final String code;
     private final HttpStatus status;
 
-    public ApiException(String code, HttpStatus status, String message) {
+    public BusinessException(String code, HttpStatus status, String message) {
         super(message);
         this.code = code;
         this.status = status;

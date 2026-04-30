@@ -2,7 +2,7 @@ package com.dodo.todo.auth.social.client;
 
 import com.dodo.todo.auth.social.domain.OAuthUserInfo;
 import com.dodo.todo.auth.social.domain.SocialProvider;
-import com.dodo.todo.common.exception.ApiException;
+import com.dodo.todo.common.exception.BusinessException;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -99,7 +99,7 @@ public class GoogleApiAuthClient implements OAuthClient {
 
     private void validateTokenResponse(GoogleTokenResponse tokenResponse) {
         if (tokenResponse == null || tokenResponse.accessToken() == null || tokenResponse.accessToken().isBlank()) {
-            throw new ApiException(
+            throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
                     HttpStatus.UNAUTHORIZED,
                     "Social authentication failed"
@@ -109,7 +109,7 @@ public class GoogleApiAuthClient implements OAuthClient {
 
     private void validateUserInfoResponse(GoogleUserInfoResponse userInfoResponse) {
         if (userInfoResponse == null) {
-            throw new ApiException(
+            throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
                     HttpStatus.UNAUTHORIZED,
                     "Social authentication failed"
