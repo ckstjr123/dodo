@@ -10,6 +10,7 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class RecurrenceRuleTest {
 
@@ -78,6 +79,23 @@ class RecurrenceRuleTest {
 
         assertThat(rule.getNextDate(date))
                 .contains(month.with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY)));
+    }
+
+    @Test
+    @DisplayName("월간 byDay 반복은 offset이 필요하다")
+    void rejectMonthlyByDayWithoutOffset() {
+        LocalDate date = LocalDate.of(2026, 2, 1);
+        RecurrenceRule rule = new RecurrenceRule(
+                Frequency.MONTHLY,
+                1,
+                WeekDays.of(0, List.of(Day.MO)),
+                null,
+                null
+        );
+
+        assertThatThrownBy(() -> rule.getNextDate(date))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(RecurrenceRuleError.MONTHLY_BY_DAY_OFFSET_REQUIRED.message());
     }
 
     @Test
