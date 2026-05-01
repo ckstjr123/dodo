@@ -15,19 +15,19 @@
 
 ## Todo Create
 
-- 생성 요청 필드: `categoryId`, `parentTodoId(mainTodoId)`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrenceRule`
+- 생성 요청 필드: `categoryId`, `parentTodoId(mainTodoId)`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrence`
 - `categoryId`, `title`은 필수다.
 - `title` 최대 길이는 200자다.
 - `memo` 최대 길이는 1000자다.
 - `mainTodoId`는 선택 값이다.
 - `mainTodoId`는 현재 회원이 소유한 루트 Todo만 허용한다.
 - 하위 Todo 아래에 다시 하위 Todo를 생성할 수 없다.
-- `recurrenceRule`이 없는 Todo는 `scheduledDate`가 선택 값이다.
-- `recurrenceRule`이 있는 Todo는 `scheduledDate`가 필수다.
+- `recurrence`가 없는 Todo는 `scheduledDate`가 선택 값이다.
+- `recurrence`가 있는 Todo는 `scheduledDate`가 필수다.
 
 ## Recurrence Rule
 
-- 반복 설정은 `recurrence_rule` JSON 컬럼 하나로 저장한다.
+- 반복 설정은 `recurrence` JSON 컬럼 하나로 저장한다.
 - Java 값 객체는 `RecurrenceRule`을 사용한다.
 - 요일 약어는 RFC 5545 값을 따른다: `MO`, `TU`, `WE`, `TH`, `FR`, `SA`, `SU`
 - `until`은 반복 종료일이다.
@@ -54,7 +54,7 @@
 - Monthly 특정 주차 특정 요일: `{ "frequency": "MONTHLY", "interval": 1, "byDay": { "offset": 2, "days": ["MO"] } }`
 - `interval`은 1 이상 정수다.
 - API에서 `byDay`와 `byMonthDay` 동시 사용은 허용하지 않는다.
-- Java 값 객체인 `RecurrenceRule`은 단순 저장 모델로 `byDay`, `byMonthDay`를 모두 필드로 가지며, API 요청 제약은 `RecurrenceRuleRequest`에서 검증한다.
+- Java 값 객체인 `RecurrenceRule`은 순수 반복 규칙으로 `byDay`, `byMonthDay`를 모두 필드로 가지며, Todo 완료 기준은 `TodoRecurrence`에서 관리한다.
 - `byDay.days`는 `MO`~`SU`만 허용한다.
 - Weekly `byDay`는 `offset`을 사용할 수 없다.
 - Monthly `byDay`는 `offset` 1~5와 `MO`~`SU` 조합만 허용한다.

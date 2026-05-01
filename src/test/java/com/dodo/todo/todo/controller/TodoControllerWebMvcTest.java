@@ -15,14 +15,16 @@ import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.Day;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
+import com.dodo.todo.recurrencerule.Day;
+import com.dodo.todo.recurrencerule.Frequency;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.dto.ByDayRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleResponse;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
+import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
+import com.dodo.todo.todo.dto.TodoRecurrenceResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.service.TodoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -176,12 +178,14 @@ class TodoControllerWebMvcTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 LocalDate.of(2026, 5, 7),
                 LocalTime.of(14, 0),
-                new RecurrenceRuleRequest(
-                        Frequency.MONTHLY,
-                        1,
-                        new ByDayRequest(1, List.of(Day.MO)),
-                        null,
-                        null,
+                new TodoRecurrenceRequest(
+                        new RecurrenceRuleRequest(
+                                Frequency.MONTHLY,
+                                1,
+                                new ByDayRequest(1, List.of(Day.MO)),
+                                null,
+                                null
+                        ),
                         RecurrenceCriteria.SCHEDULED_DATE
                 )
         );
@@ -214,13 +218,15 @@ class TodoControllerWebMvcTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0),
-                new RecurrenceRuleResponse(
-                        Frequency.MONTHLY,
-                        1,
-                        1,
-                        List.of(Day.MO),
-                        null,
-                        null,
+                new TodoRecurrenceResponse(
+                        new RecurrenceRuleResponse(
+                                Frequency.MONTHLY,
+                                1,
+                                1,
+                                List.of(Day.MO),
+                                null,
+                                null
+                        ),
                         RecurrenceCriteria.SCHEDULED_DATE
                 ),
                 List.of(new TodoResponse(

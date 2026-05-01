@@ -9,7 +9,7 @@ import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
@@ -35,7 +35,7 @@ public class TodoService {
         Member member = memberService.findById(memberId);
         Category category = findCategory(member, request.categoryId());
         Todo mainTodo = findMainTodo(memberId, request.parentTodoId());
-        RecurrenceRule recurrenceRule = request.getRecurrenceRule();
+        TodoRecurrence recurrence = request.getRecurrence();
 
         Todo todo = Todo.builder()
                 .member(member)
@@ -48,7 +48,7 @@ public class TodoService {
                 .dueAt(request.dueAt())
                 .scheduledDate(request.scheduledDate())
                 .scheduledTime(request.scheduledTime())
-                .recurrenceRule(recurrenceRule)
+                .recurrence(recurrence)
                 .build();
 
         return todoRepository.save(todo).getId();

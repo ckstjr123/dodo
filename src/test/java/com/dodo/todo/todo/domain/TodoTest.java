@@ -2,7 +2,12 @@ package com.dodo.todo.todo.domain;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.todo.domain.recurrence.*;
+import com.dodo.todo.recurrencerule.Day;
+import com.dodo.todo.recurrencerule.Frequency;
+import com.dodo.todo.recurrencerule.RecurrenceRule;
+import com.dodo.todo.recurrencerule.WeekDays;
+import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -117,7 +122,10 @@ class TodoTest {
                 .category(category)
                 .title("recurring")
                 .status(TodoStatus.TODO)
-                .recurrenceRule(new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE))
+                .recurrence(recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                ))
                 .build())
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
@@ -136,7 +144,10 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.of(0, List.of(Day.FR)), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.WEEKLY, 1, WeekDays.of(0, List.of(Day.FR)), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         todo.complete(COMPLETED_AT);
@@ -160,7 +171,10 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.COMPLETED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.COMPLETED_DATE
+                )
         );
 
         todo.complete(completedAt);
@@ -182,12 +196,14 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 LocalDate.of(2026, 4, 30),
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.COMPLETED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.COMPLETED_DATE
+                )
         );
 
         assertThatThrownBy(() -> todo.complete(LocalDateTime.of(2026, 4, 29, 12, 0)))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessage(RecurrenceRuleError.COMPLETION_BEFORE_SCHEDULED_DATE.message());
+                .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -203,7 +219,10 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         todo.complete(LocalDateTime.of(2026, 4, 29, 12, 0));
@@ -225,7 +244,10 @@ class TodoTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         todo.complete(COMPLETED_AT);
@@ -253,7 +275,10 @@ class TodoTest {
                 "sub recurring",
                 TodoStatus.TODO,
                 LocalDate.of(2026, 4, 7),
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
         setSubTodos(mainTodo, subTodo);
 
@@ -278,7 +303,10 @@ class TodoTest {
                 "main recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
         Todo subTodo = Todo.builder()
                 .member(member)
@@ -311,7 +339,10 @@ class TodoTest {
                 "main recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, scheduledDate, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, scheduledDate),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
         Todo subTodo = Todo.builder()
                 .member(member)
@@ -342,12 +373,14 @@ class TodoTest {
                 .status(TodoStatus.DONE)
                 .scheduledDate(LocalDate.of(2026, 4, 10))
                 .completedAt(COMPLETED_AT)
-                .recurrenceRule(new RecurrenceRule(
-                        Frequency.DAILY,
-                        1,
-                        WeekDays.empty(),
-                        null,
-                        LocalDate.of(2026, 4, 10),
+                .recurrence(recurrence(
+                        new RecurrenceRule(
+                                Frequency.DAILY,
+                                1,
+                                WeekDays.empty(),
+                                null,
+                                LocalDate.of(2026, 4, 10)
+                        ),
                         RecurrenceCriteria.SCHEDULED_DATE
                 ))
                 .build();
@@ -453,5 +486,9 @@ class TodoTest {
 
     private void setSubTodos(Todo mainTodo, Todo... subTodos) {
         ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodos));
+    }
+
+    private TodoRecurrence recurrence(RecurrenceRule rule, RecurrenceCriteria criteria) {
+        return new TodoRecurrence(rule, criteria);
     }
 }

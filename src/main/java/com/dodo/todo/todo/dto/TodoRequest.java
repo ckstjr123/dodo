@@ -1,6 +1,6 @@
 package com.dodo.todo.todo.dto;
 
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
@@ -33,15 +33,15 @@ public record TodoRequest(
         LocalTime scheduledTime,
 
         @Valid
-        RecurrenceRuleRequest recurrenceRule
+        TodoRecurrenceRequest recurrence
 ) {
 
-    public RecurrenceRule getRecurrenceRule() {
-        if (recurrenceRule == null) {
+    public TodoRecurrence getRecurrence() {
+        if (recurrence == null) {
             return null;
         }
 
-        return recurrenceRule.toRecurrenceRule();
+        return recurrence.toTodoRecurrence();
     }
 
 }

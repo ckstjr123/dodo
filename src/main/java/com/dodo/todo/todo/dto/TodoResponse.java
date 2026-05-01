@@ -19,7 +19,7 @@ public record TodoResponse(
         LocalDateTime dueAt,
         LocalDate scheduledDate,
         LocalTime scheduledTime,
-        RecurrenceRuleResponse recurrenceRule,
+        TodoRecurrenceResponse recurrence,
         List<TodoResponse> subTodos
 ) {
 
@@ -36,7 +36,7 @@ public record TodoResponse(
                 todo.getDueAt(),
                 todo.getScheduledDate(),
                 todo.getScheduledTime(),
-                RecurrenceRuleResponse.from(todo.getRecurrenceRule()),
+                TodoRecurrenceResponse.from(todo.getRecurrence()),
                 todo.getSubTodos().stream()
                         .map(TodoResponse::from)
                         .toList()

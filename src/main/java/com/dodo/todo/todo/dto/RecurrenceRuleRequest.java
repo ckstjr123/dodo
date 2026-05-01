@@ -1,10 +1,9 @@
 package com.dodo.todo.todo.dto;
 
 import com.dodo.todo.common.exception.BusinessException;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
-import com.dodo.todo.todo.domain.recurrence.WeekDays;
+import com.dodo.todo.recurrencerule.Frequency;
+import com.dodo.todo.recurrencerule.RecurrenceRule;
+import com.dodo.todo.recurrencerule.WeekDays;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -25,9 +24,7 @@ public record RecurrenceRuleRequest(
         @Max(31)
         Integer byMonthDay,
 
-        LocalDate until,
-
-        RecurrenceCriteria criteria
+        LocalDate until
 ) {
 
     public RecurrenceRule toRecurrenceRule() {
@@ -38,8 +35,7 @@ public record RecurrenceRuleRequest(
                 interval,
                 toWeekDays(),
                 byMonthDay,
-                until,
-                criteria
+                until
         );
     }
 

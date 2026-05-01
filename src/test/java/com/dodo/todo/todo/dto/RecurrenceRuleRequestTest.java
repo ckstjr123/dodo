@@ -3,9 +3,8 @@ package com.dodo.todo.todo.dto;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.dodo.todo.common.exception.BusinessException;
-import com.dodo.todo.todo.domain.recurrence.Day;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
+import com.dodo.todo.recurrencerule.Day;
+import com.dodo.todo.recurrencerule.Frequency;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -20,8 +19,7 @@ class RecurrenceRuleRequestTest {
                 1,
                 new ByDayRequest(null, List.of(Day.MO)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
@@ -37,8 +35,7 @@ class RecurrenceRuleRequestTest {
                 1,
                 new ByDayRequest(1, List.of(Day.MO)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
@@ -54,8 +51,7 @@ class RecurrenceRuleRequestTest {
                 1,
                 new ByDayRequest(2, List.of(Day.MO, Day.TU)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
@@ -71,8 +67,7 @@ class RecurrenceRuleRequestTest {
                 1,
                 new ByDayRequest(2, List.of(Day.MO)),
                 15,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThatThrownBy(request::toRecurrenceRule)
