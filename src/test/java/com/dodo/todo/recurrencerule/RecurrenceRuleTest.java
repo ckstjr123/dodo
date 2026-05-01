@@ -15,7 +15,7 @@ class RecurrenceRuleTest {
 
     @Test
     @DisplayName("일 반복은 ical4j를 사용해 다음 날짜를 계산한다")
-    void dailyNextDate() {
+    void dailyGetNextDate() {
         int interval = 2;
         LocalDate date = LocalDate.of(2026, 4, 7);
         RecurrenceRule rule = new RecurrenceRule(
@@ -26,13 +26,13 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(date.plusDays(interval));
     }
 
     @Test
     @DisplayName("주 반복은 RFC 5545 BYDAY를 사용해 다음 날짜를 계산한다")
-    void weeklyNextDate() {
+    void weeklyGetNextDate() {
         LocalDate date = LocalDate.of(2026, 4, 7);
         RecurrenceRule rule = new RecurrenceRule(
                 Frequency.WEEKLY,
@@ -42,13 +42,13 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(date.with(TemporalAdjusters.next(DayOfWeek.FRIDAY)));
     }
 
     @Test
     @DisplayName("월 n주차 요일 반복은 다음 달의 지정 주차 요일을 계산한다")
-    void monthlyNthWeekdayNextDate() {
+    void monthlyNthWeekdayGetNextDate() {
         LocalDate date = LocalDate.of(2026, 1, 12);
         LocalDate nextMonth = date.withDayOfMonth(1).plusMonths(1);
         RecurrenceRule rule = new RecurrenceRule(
@@ -59,7 +59,7 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(nextMonth.with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY)));
     }
 
@@ -76,7 +76,7 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(month.with(TemporalAdjusters.dayOfWeekInMonth(2, DayOfWeek.MONDAY)));
     }
 
@@ -93,7 +93,7 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(nextMonth.with(TemporalAdjusters.lastInMonth(DayOfWeek.FRIDAY)));
     }
 
@@ -109,7 +109,7 @@ class RecurrenceRuleTest {
                 null
         );
 
-        assertThat(rule.nextDate(date))
+        assertThat(rule.getNextDate(date))
                 .contains(YearMonth.from(date).plusMonths(1).atEndOfMonth());
     }
 

@@ -30,7 +30,7 @@ public record RecurrenceRule(
      * 다음 반복일을 계산한다.
      * 다음 반복 후보가 없거나 종료일을 넘으면 empty Optional을 반환한다.
      */
-    public Optional<LocalDate> nextDate(LocalDate date) {
+    public Optional<LocalDate> getNextDate(LocalDate date) {
         if (date == null) {
             throw new IllegalArgumentException(RecurrenceRuleError.CURRENT_DATE_REQUIRED.message());
         }
