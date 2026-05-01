@@ -15,16 +15,16 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleUnexpectedException(Exception exception) {
+    @ExceptionHandler
+    public ResponseEntity<ErrorResponse> handleException(Exception exception) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ErrorResponse.of("INTERNAL_SERVER_ERROR", "Unexpected server error"));
     }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleApiException(BusinessException exception) {
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
         log.error("Unhandled exception occurred", exception);
-        return ResponseEntity.status(exception.getStatus())
+        return ResponseEntity.status(HttpStatus.valueOf(exception.getStatus()))
                 .body(ErrorResponse.of(exception.getCode(), exception.getMessage()));
     }
 

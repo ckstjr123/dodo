@@ -21,6 +21,10 @@ public class MemberService {
     @Transactional(readOnly = true)
     public Member findById(Long memberId) {
         return memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
+                .orElseThrow(() -> new BusinessException(
+                        "MEMBER_NOT_FOUND",
+                        HttpStatus.NOT_FOUND.value(),
+                        "Member not found"
+                ));
     }
 }

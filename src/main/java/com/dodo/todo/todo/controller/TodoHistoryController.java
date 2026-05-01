@@ -40,11 +40,7 @@ public class TodoHistoryController implements TodoHistoryApiDocs {
             @RequestParam(defaultValue = "30") Integer size
     ) {
         if ((cursorCompletedAt == null) != (cursorId == null)) {
-            throw new BusinessException(
-                    TodoError.INVALID_CURSOR.code(),
-                    TodoError.INVALID_CURSOR.status(),
-                    TodoError.INVALID_CURSOR.message()
-            );
+            throw new BusinessException(TodoError.INVALID_CURSOR);
         }
 
         int pageSize = size < 1 ? DEFAULT_HISTORY_SIZE : Math.min(size, MAX_HISTORY_SIZE);

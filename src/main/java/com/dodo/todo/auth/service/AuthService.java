@@ -43,16 +43,28 @@ public class AuthService {
     @Transactional
     public TokenResponse refresh(RefreshTokenRequest request) {
         if (!jwtTokenProvider.isValidRefreshToken(request.refreshToken())) {
-            throw new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+            throw new BusinessException(
+                    "INVALID_REFRESH_TOKEN",
+                    HttpStatus.UNAUTHORIZED.value(),
+                    "Refresh token is invalid"
+            );
         }
 
         RefreshToken storedRefreshToken = refreshTokenRepository.findByToken(request.refreshToken())
-                .orElseThrow(() -> new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid"));
+                .orElseThrow(() -> new BusinessException(
+                        "INVALID_REFRESH_TOKEN",
+                        HttpStatus.UNAUTHORIZED.value(),
+                        "Refresh token is invalid"
+                ));
         LocalDateTime now = LocalDateTime.now();
 
         if (storedRefreshToken.isExpired(now)) {
             refreshTokenRepository.delete(storedRefreshToken);
-            throw new BusinessException("INVALID_REFRESH_TOKEN", HttpStatus.UNAUTHORIZED, "Refresh token is invalid");
+            throw new BusinessException(
+                    "INVALID_REFRESH_TOKEN",
+                    HttpStatus.UNAUTHORIZED.value(),
+                    "Refresh token is invalid"
+            );
         }
 
         Long memberId = storedRefreshToken.getMemberId();
@@ -72,7 +84,11 @@ public class AuthService {
     @Transactional(readOnly = true)
     public MemberResponse getCurrentMember(Long memberId) {
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException("MEMBER_NOT_FOUND", HttpStatus.NOT_FOUND, "Member not found"));
+                .orElseThrow(() -> new BusinessException(
+                        "MEMBER_NOT_FOUND",
+                        HttpStatus.NOT_FOUND.value(),
+                        "Member not found"
+                ));
 
         return new MemberResponse(member.getId(), member.getEmail());
     }
@@ -102,7 +118,7 @@ public class AuthService {
         if (userInfo.providerUserId() == null || userInfo.providerUserId().isBlank()) {
             throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED.value(),
                     "Social account id is missing"
             );
         }
@@ -110,7 +126,7 @@ public class AuthService {
         if (userInfo.email() == null || userInfo.email().isBlank()) {
             throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED.value(),
                     "Social account email is missing"
             );
         }
@@ -118,7 +134,7 @@ public class AuthService {
         if (!userInfo.emailVerified()) {
             throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED.value(),
                     "Social account email is not verified"
             );
         }

@@ -85,10 +85,10 @@ public class TodoService {
 
     private Category findCategory(Member member, Long categoryId) {
         Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> toApiException(TodoError.CATEGORY_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(TodoError.CATEGORY_NOT_FOUND));
 
         if (!category.isOwnedBy(member)) {
-            throw toApiException(TodoError.CATEGORY_NOT_FOUND);
+            throw new BusinessException(TodoError.CATEGORY_NOT_FOUND);
         }
 
         return category;
@@ -100,10 +100,10 @@ public class TodoService {
         }
 
         Todo todo = todoRepository.findByIdAndMemberId(mainTodoId, memberId)
-                .orElseThrow(() -> toApiException(TodoError.TODO_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
 
         if (todo.hasMainTodo()) {
-            throw toApiException(TodoError.TODO_DEPTH_LIMIT_EXCEEDED);
+            throw new BusinessException(TodoError.TODO_DEPTH_LIMIT_EXCEEDED);
         }
 
         return todo;
@@ -111,10 +111,6 @@ public class TodoService {
 
     private Todo findTodoWithSubTodos(Long memberId, Long todoId) {
         return todoRepository.findWithSubTodos(todoId, memberId)
-                .orElseThrow(() -> toApiException(TodoError.TODO_NOT_FOUND));
-    }
-
-    private BusinessException toApiException(TodoError error) {
-        return new BusinessException(error.code(), error.status(), error.message());
+                .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
     }
 }
