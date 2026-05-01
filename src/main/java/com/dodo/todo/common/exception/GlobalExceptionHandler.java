@@ -9,30 +9,31 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ExceptionHandler
-    public ResponseEntity<ErrorResponse> handleException(Exception exception) {
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ErrorResponse.of("INTERNAL_SERVER_ERROR", "Unexpected server error"));
+    public ErrorResponse handleException(Exception ex) {
+        return ErrorResponse.of("INTERNAL_SERVER_ERROR", "오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     }
 
     @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException exception) {
-        log.error("Unhandled exception occurred", exception);
-        return ResponseEntity.status(HttpStatus.valueOf(exception.getStatus()))
-                .body(ErrorResponse.of(exception.getCode(), exception.getMessage()));
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessException ex) {
+        log.error("Unhandled exception occurred", ex);
+        return ResponseEntity.status(HttpStatus.valueOf(ex.getStatus()))
+                .body(ErrorResponse.of(ex.getCode(), ex.getMessage()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException exception) {
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         Map<String, String> validationErrors = new LinkedHashMap<>();
 
-        for (FieldError fieldError : exception.getBindingResult().getFieldErrors()) {
+        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
             validationErrors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
         }
 
