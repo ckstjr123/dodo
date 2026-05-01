@@ -66,7 +66,7 @@ public class TodoHistory {
         this.completedAt = completedAt;
     }
 
-    /** ?꾩옱 todo title???ъ슜???꾨즺 ?대젰???앹꽦?쒕떎. */
+    /** 현재 Todo 제목을 사용해 완료 이력을 생성한다. */
     public static TodoHistory create(Todo todo, LocalDateTime completedAt) {
         if (todo == null) {
             throw new IllegalArgumentException(TodoHistoryError.TODO_REQUIRED.message());
