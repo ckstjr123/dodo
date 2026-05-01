@@ -3,8 +3,8 @@ package com.dodo.todo.todo.domain;
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.common.entity.BaseEntity;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRuleConverter;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrenceConverter;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -72,9 +72,9 @@ public class Todo extends BaseEntity {
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
-    @Convert(converter = RecurrenceRuleConverter.class)
-    @Column(name = "recurrence_rule", columnDefinition = "json")
-    private RecurrenceRule recurrenceRule;
+    @Convert(converter = TodoRecurrenceConverter.class)
+    @Column(name = "recurrence", columnDefinition = "json")
+    private TodoRecurrence recurrence;
 
     @Builder
     private Todo(
@@ -89,13 +89,13 @@ public class Todo extends BaseEntity {
             LocalDate scheduledDate,
             LocalTime scheduledTime,
             LocalDateTime completedAt,
-            RecurrenceRule recurrenceRule
+            TodoRecurrence recurrence
     ) {
         if (mainTodo != null && !mainTodo.isOwnedBy(member)) {
             throw new IllegalArgumentException(TodoError.MAIN_TODO_NOT_OWNED.message());
         }
         validateStatus(status);
-        validateRecurrenceSchedule(recurrenceRule, scheduledDate);
+        validateRecurrenceSchedule(recurrence, scheduledDate);
         this.member = member;
         this.category = category;
         this.mainTodo = mainTodo;
@@ -107,7 +107,7 @@ public class Todo extends BaseEntity {
         this.scheduledDate = scheduledDate;
         this.scheduledTime = scheduledTime;
         this.completedAt = completedAt;
-        this.recurrenceRule = recurrenceRule;
+        this.recurrence = recurrence;
     }
 
     public Long getCategoryId() {
@@ -138,7 +138,7 @@ public class Todo extends BaseEntity {
     }
 
     public boolean isRecurringTodo() {
-        return recurrenceRule != null;
+        return recurrence != null;
     }
 
     /**
@@ -174,7 +174,7 @@ public class Todo extends BaseEntity {
             return Optional.empty();
         }
 
-        return recurrenceRule.nextDate(scheduledDate, completedAt.toLocalDate());
+        return recurrence.nextDate(scheduledDate, completedAt.toLocalDate());
     }
 
 
@@ -222,8 +222,8 @@ public class Todo extends BaseEntity {
         }
     }
 
-    private void validateRecurrenceSchedule(RecurrenceRule recurrenceRule, LocalDate scheduledDate) {
-        if (recurrenceRule != null && scheduledDate == null) {
+    private void validateRecurrenceSchedule(TodoRecurrence recurrence, LocalDate scheduledDate) {
+        if (recurrence != null && scheduledDate == null) {
             throw new IllegalArgumentException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
         }
     }

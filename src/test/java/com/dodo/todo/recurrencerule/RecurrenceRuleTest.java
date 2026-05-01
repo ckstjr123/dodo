@@ -1,6 +1,5 @@
-package com.dodo.todo.todo.domain;
+package com.dodo.todo.recurrencerule;
 
-import com.dodo.todo.todo.domain.recurrence.*;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -24,8 +23,7 @@ class RecurrenceRuleTest {
                 interval,
                 WeekDays.empty(),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -41,8 +39,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.of(0, List.of(Day.MO, Day.FR)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -59,8 +56,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.of(2, List.of(Day.MO)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -77,8 +73,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.of(2, List.of(Day.MO)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -95,8 +90,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.of(5, List.of(Day.FR)),
                 null,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -112,8 +106,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.empty(),
                 31,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.nextDate(date))
@@ -128,8 +121,7 @@ class RecurrenceRuleTest {
                 1,
                 WeekDays.of(2, List.of(Day.MO)),
                 15,
-                null,
-                RecurrenceCriteria.SCHEDULED_DATE
+                null
         );
 
         assertThat(rule.byDay().days()).containsExactly(Day.MO);

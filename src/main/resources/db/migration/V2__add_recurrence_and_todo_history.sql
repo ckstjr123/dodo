@@ -9,7 +9,7 @@ ALTER TABLE todo
     ADD COLUMN parent_todo_id BIGINT NULL,
     ADD COLUMN scheduled_date DATE NULL,
     ADD COLUMN scheduled_time TIME NULL,
-    ADD COLUMN recurrence_rule JSON NULL;
+    ADD COLUMN recurrence JSON NULL;
 
 ALTER TABLE todo
     ADD CONSTRAINT fk_todo_parent

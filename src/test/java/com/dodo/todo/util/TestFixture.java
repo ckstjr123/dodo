@@ -4,7 +4,7 @@ import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
@@ -45,7 +45,7 @@ public final class TestFixture {
             String title,
             TodoStatus status,
             LocalDate scheduledDate,
-            RecurrenceRule recurrenceRule
+            TodoRecurrence recurrence
     ) {
         Todo todo = Todo.builder()
                 .member(member)
@@ -54,7 +54,7 @@ public final class TestFixture {
                 .title(title)
                 .status(status)
                 .scheduledDate(scheduledDate)
-                .recurrenceRule(recurrenceRule)
+                .recurrence(recurrence)
                 .dueAt(null)
                 .build();
         setId(todo, id);

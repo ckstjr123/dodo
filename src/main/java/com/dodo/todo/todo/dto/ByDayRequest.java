@@ -1,8 +1,8 @@
 package com.dodo.todo.todo.dto;
 
 import com.dodo.todo.common.exception.BusinessException;
-import com.dodo.todo.todo.domain.recurrence.Day;
-import com.dodo.todo.todo.domain.recurrence.WeekDays;
+import com.dodo.todo.recurrencerule.Day;
+import com.dodo.todo.recurrencerule.WeekDays;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;

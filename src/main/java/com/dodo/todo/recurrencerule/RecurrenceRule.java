@@ -1,4 +1,4 @@
-package com.dodo.todo.todo.domain.recurrence;
+package com.dodo.todo.recurrencerule;
 
 import net.fortuna.ical4j.model.Recur;
 
@@ -11,8 +11,7 @@ public record RecurrenceRule(
         int interval,
         WeekDays byDay,
         Integer byMonthDay,
-        LocalDate until,
-        RecurrenceCriteria criteria
+        LocalDate until
 ) {
 
     public RecurrenceRule {
@@ -25,20 +24,6 @@ public record RecurrenceRule(
         if (byDay == null) {
             byDay = WeekDays.empty();
         }
-        if (criteria == null) {
-            criteria = RecurrenceCriteria.SCHEDULED_DATE;
-        }
-    }
-
-    public Optional<LocalDate> nextDate(LocalDate scheduledDate, LocalDate completedDate) {
-        if (criteria == RecurrenceCriteria.COMPLETED_DATE) {
-            if (scheduledDate.isAfter(completedDate)) {
-                throw new IllegalStateException(RecurrenceRuleError.COMPLETION_BEFORE_SCHEDULED_DATE.message());
-            }
-            return nextDate(completedDate);
-        }
-
-        return nextDate(scheduledDate);
     }
 
     /**

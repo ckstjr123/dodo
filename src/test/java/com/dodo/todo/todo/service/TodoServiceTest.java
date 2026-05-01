@@ -9,12 +9,14 @@ import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.todo.domain.recurrence.Frequency;
-import com.dodo.todo.todo.domain.recurrence.RecurrenceRule;
+import com.dodo.todo.recurrencerule.Frequency;
+import com.dodo.todo.recurrencerule.RecurrenceRule;
+import com.dodo.todo.recurrencerule.WeekDays;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
-import com.dodo.todo.todo.domain.recurrence.WeekDays;
+import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import com.dodo.todo.todo.dto.ByDayRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
+import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
@@ -28,7 +30,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.util.List;
 import java.util.Optional;
 
 import static com.dodo.todo.util.TestFixture.*;
@@ -143,7 +144,10 @@ class TodoServiceTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -170,7 +174,10 @@ class TodoServiceTest {
                 "recurring",
                 TodoStatus.TODO,
                 scheduledDate,
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until, RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, until),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -194,7 +201,10 @@ class TodoServiceTest {
                 "recurring",
                 TodoStatus.DONE,
                 LocalDate.of(2026, 4, 10),
-                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 5, 10), RecurrenceCriteria.SCHEDULED_DATE)
+                recurrence(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, LocalDate.of(2026, 5, 10)),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
         );
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -222,7 +232,7 @@ class TodoServiceTest {
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
     }
 
-    private TodoRequest createTodoRequest(Long categoryId, Long mainTodoId, RecurrenceRule recurrenceRule) {
+    private TodoRequest createTodoRequest(Long categoryId, Long mainTodoId, TodoRecurrence recurrence) {
         return new TodoRequest(
                 categoryId,
                 mainTodoId,
@@ -232,24 +242,31 @@ class TodoServiceTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0),
-                createRecurrenceRuleRequest(recurrenceRule)
+                createTodoRecurrenceRequest(recurrence)
         );
     }
 
-    private RecurrenceRuleRequest createRecurrenceRuleRequest(RecurrenceRule recurrenceRule) {
-        if (recurrenceRule == null) {
+    private TodoRecurrenceRequest createTodoRecurrenceRequest(TodoRecurrence recurrence) {
+        if (recurrence == null) {
             return null;
         }
 
-        return new RecurrenceRuleRequest(
-                recurrenceRule.frequency(),
-                recurrenceRule.interval(),
-                recurrenceRule.byDay().isEmpty()
+        RecurrenceRule rule = recurrence.rule();
+        return new TodoRecurrenceRequest(
+                new RecurrenceRuleRequest(
+                        rule.frequency(),
+                        rule.interval(),
+                        rule.byDay().isEmpty()
                         ? null
-                        : new ByDayRequest(recurrenceRule.byDay().offset(), List.copyOf(recurrenceRule.byDay().days())),
-                recurrenceRule.byMonthDay(),
-                recurrenceRule.until(),
-                recurrenceRule.criteria()
+                        : new ByDayRequest(rule.byDay().offset(), rule.byDay().days()),
+                        rule.byMonthDay(),
+                        rule.until()
+                ),
+                recurrence.criteria()
         );
+    }
+
+    private TodoRecurrence recurrence(RecurrenceRule rule, RecurrenceCriteria criteria) {
+        return new TodoRecurrence(rule, criteria);
     }
 }

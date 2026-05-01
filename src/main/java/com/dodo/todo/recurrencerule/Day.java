@@ -1,4 +1,4 @@
-package com.dodo.todo.todo.domain.recurrence;
+package com.dodo.todo.recurrencerule;
 
 import java.time.DayOfWeek;
 
