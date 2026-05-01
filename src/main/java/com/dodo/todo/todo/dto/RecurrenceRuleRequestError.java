@@ -1,8 +1,8 @@
 package com.dodo.todo.todo.dto;
 
-import org.springframework.http.HttpStatus;
+import com.dodo.todo.common.exception.ErrorCode;
 
-public enum RecurrenceRuleRequestError {
+public enum RecurrenceRuleRequestError implements ErrorCode {
 
     BY_DAY_AND_BY_MONTH_DAY_TOGETHER("byDay and byMonthDay cannot be used together"),
     DAILY_DETAIL_VALUES("Daily recurrence must not have detail values"),
@@ -22,8 +22,8 @@ public enum RecurrenceRuleRequestError {
         return "VALIDATION_ERROR";
     }
 
-    public HttpStatus status() {
-        return HttpStatus.BAD_REQUEST;
+    public int status() {
+        return 400;
     }
 
     public String message() {

@@ -1,23 +1,25 @@
 package com.dodo.todo.common.exception;
 
-import org.springframework.http.HttpStatus;
-
 public class BusinessException extends RuntimeException {
 
     private final String code;
-    private final HttpStatus status;
+    private final int status;
 
-    public BusinessException(String code, HttpStatus status, String message) {
+    public BusinessException(String code, int status, String message) {
         super(message);
         this.code = code;
         this.status = status;
+    }
+
+    public BusinessException(ErrorCode errorCode) {
+        this(errorCode.code(), errorCode.status(), errorCode.message());
     }
 
     public String getCode() {
         return code;
     }
 
-    public HttpStatus getStatus() {
+    public int getStatus() {
         return status;
     }
 }

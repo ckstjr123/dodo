@@ -76,7 +76,7 @@ public record RecurrenceRuleRequest(
     }
 
     private void throwValidationError(RecurrenceRuleRequestError error) {
-        throw new BusinessException(error.code(), error.status(), error.message());
+        throw new BusinessException(error);
     }
 
     private boolean hasByDay() {

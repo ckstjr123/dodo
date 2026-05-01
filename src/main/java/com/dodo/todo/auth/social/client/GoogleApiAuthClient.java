@@ -101,7 +101,7 @@ public class GoogleApiAuthClient implements OAuthClient {
         if (tokenResponse == null || tokenResponse.accessToken() == null || tokenResponse.accessToken().isBlank()) {
             throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED.value(),
                     "Social authentication failed"
             );
         }
@@ -111,7 +111,7 @@ public class GoogleApiAuthClient implements OAuthClient {
         if (userInfoResponse == null) {
             throw new BusinessException(
                     "SOCIAL_AUTHENTICATION_FAILED",
-                    HttpStatus.UNAUTHORIZED,
+                    HttpStatus.UNAUTHORIZED.value(),
                     "Social authentication failed"
             );
         }

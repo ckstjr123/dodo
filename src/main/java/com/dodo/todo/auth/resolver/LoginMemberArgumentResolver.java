@@ -35,7 +35,7 @@ public class LoginMemberArgumentResolver implements HandlerMethodArgumentResolve
                 || !authentication.isAuthenticated()
                 || authentication instanceof AnonymousAuthenticationToken
                 || !(authentication.getPrincipal() instanceof MemberPrincipal memberPrincipal)) {
-            throw new BusinessException("UNAUTHORIZED", HttpStatus.UNAUTHORIZED, "Authentication is required");
+            throw new BusinessException("UNAUTHORIZED", HttpStatus.UNAUTHORIZED.value(), "Authentication is required");
         }
 
         return memberPrincipal.getId();

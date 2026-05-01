@@ -23,7 +23,7 @@ public class OAuthClients {
                 .findFirst()
                 .orElseThrow(() -> new BusinessException(
                         "UNSUPPORTED_SOCIAL_PROVIDER",
-                        HttpStatus.BAD_REQUEST,
+                        HttpStatus.BAD_REQUEST.value(),
                         "Unsupported social provider"
                 ));
 
