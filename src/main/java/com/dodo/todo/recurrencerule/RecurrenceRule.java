@@ -14,6 +14,8 @@ public record RecurrenceRule(
         LocalDate until
 ) {
 
+    private static final int FIRST_DAY_OF_MONTH = 1;
+
     public RecurrenceRule {
         if (frequency == null) {
             throw new IllegalArgumentException(RecurrenceRuleError.FREQUENCY_REQUIRED.message());
@@ -35,21 +37,15 @@ public record RecurrenceRule(
             throw new IllegalArgumentException(RecurrenceRuleError.CURRENT_DATE_REQUIRED.message());
         }
 
-        if (frequency == Frequency.MONTHLY && byMonthDay != null) {
-            LocalDate targetMonth = date.withDayOfMonth(1).plusMonths(interval);
-            LocalDate nextDate =  targetMonth.withDayOfMonth(Math.min(byMonthDay, targetMonth.lengthOfMonth()));
-            return isAfterEndDate(nextDate) ? Optional.empty() : Optional.of(nextDate);
+        if (isMonthlyByMonthDay()) {
+            LocalDate targetMonth = getFirstDayOfNextIntervalMonth(date);
+            LocalDate nextDate = targetMonth.withDayOfMonth(Math.min(byMonthDay, targetMonth.lengthOfMonth()));
+            return filterByEndDate(nextDate);
         }
-        if (frequency == Frequency.MONTHLY && !byDay.isEmpty()) {
-            Optional<LocalDate> sameMonthNextDate = byDay.nextDateAfterInMonth(date);
-            if (sameMonthNextDate.isPresent()) {
-                LocalDate nextDate = sameMonthNextDate.get();
-                return isAfterEndDate(nextDate) ? Optional.empty() : Optional.of(nextDate);
-            }
-
-            LocalDate targetMonth = date.withDayOfMonth(1).plusMonths(interval);
-            LocalDate nextDate = byDay.nextDateInMonth(targetMonth);
-            return isAfterEndDate(nextDate) ? Optional.empty() : Optional.of(nextDate);
+        if (isMonthlyByDay()) {
+            return byDay.nextDateInMonthAfter(date)
+                    .flatMap(this::filterByEndDate)
+                    .or(() -> filterByEndDate(byDay.startDateInMonth(getFirstDayOfNextIntervalMonth(date))));
         }
 
         Recur<LocalDate> recur = new Recur<>(toRRuleText());
@@ -77,6 +73,22 @@ public record RecurrenceRule(
 
     private boolean isAfterEndDate(LocalDate date) {
         return until != null && date.isAfter(until);
+    }
+
+    private boolean isMonthlyByMonthDay() {
+        return frequency == Frequency.MONTHLY && byMonthDay != null;
+    }
+
+    private boolean isMonthlyByDay() {
+        return frequency == Frequency.MONTHLY && !byDay.isEmpty();
+    }
+
+    private LocalDate getFirstDayOfNextIntervalMonth(LocalDate date) {
+        return date.plusMonths(interval).withDayOfMonth(FIRST_DAY_OF_MONTH);
+    }
+
+    private Optional<LocalDate> filterByEndDate(LocalDate date) {
+        return isAfterEndDate(date) ? Optional.empty() : Optional.of(date);
     }
 
 }
