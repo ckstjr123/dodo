@@ -26,9 +26,9 @@ public record TodoRecurrence(
             if (scheduledDate.isAfter(completedDate)) {
                 throw new IllegalStateException("Completion-based recurring todos cannot be completed until the actual date arrives");
             }
-            return rule.nextDate(completedDate);
+            return rule.getNextDate(completedDate);
         }
 
-        return rule.nextDate(scheduledDate);
+        return rule.getNextDate(scheduledDate);
     }
 }

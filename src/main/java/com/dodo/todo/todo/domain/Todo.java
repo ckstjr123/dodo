@@ -154,29 +154,24 @@ public class Todo extends BaseEntity {
             throw new IllegalArgumentException(TodoError.COMPLETED_DATE_REQUIRED.message());
         }
 
-        Optional<LocalDate> nextDateOpt = nextDateAfterCompletion(completedAt);
-        nextDateOpt.ifPresentOrElse(
+        nextDate(completedAt).ifPresentOrElse(
                 nextDate -> {
                     scheduledDate = nextDate;
                     resetSubTodos();
                 },
                 () -> {
                     setStatus(TodoStatus.DONE);
-                    doneSubTodos(completedAt);
+                    completeSubTodos(completedAt);
                 }
         );
-
         this.completedAt = completedAt;
     }
 
-    private Optional<LocalDate> nextDateAfterCompletion(LocalDateTime completedAt) {
-        if (!isRecurringTodo()) {
-            return Optional.empty();
-        }
-
-        return recurrence.nextDate(scheduledDate, completedAt.toLocalDate());
+    private Optional<LocalDate> nextDate(LocalDateTime completedAt) {
+        return this.isRecurringTodo()
+                ? recurrence.nextDate(scheduledDate, completedAt.toLocalDate())
+                : Optional.empty();
     }
-
 
     /**
      * 완료를 취소한다.
@@ -202,7 +197,7 @@ public class Todo extends BaseEntity {
         this.status = todoStatus;
     }
 
-    private void doneSubTodos(LocalDateTime completedAt) {
+    private void completeSubTodos(LocalDateTime completedAt) {
         subTodos.forEach(subTodo -> {
             subTodo.setStatus(TodoStatus.DONE);
             subTodo.completedAt = completedAt;
