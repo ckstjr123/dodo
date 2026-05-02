@@ -1,7 +1,6 @@
 package com.dodo.todo.common.exception;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.stream.Collectors;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -30,14 +29,16 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
-        Map<String, String> validationErrors = new LinkedHashMap<>();
-
-        for (FieldError fieldError : ex.getBindingResult().getFieldErrors()) {
-            validationErrors.putIfAbsent(fieldError.getField(), fieldError.getDefaultMessage());
-        }
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
+        String validationMessage = ex.getBindingResult().getFieldErrors().stream()
+                .map(this::toValidationMessage)
+                .collect(Collectors.joining(", "));
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ErrorResponse.of("VALIDATION_ERROR", "Request validation failed", validationErrors));
+                .body(ErrorResponse.of("VALIDATION_ERROR", validationMessage));
+    }
+
+    private String toValidationMessage(FieldError fieldError) {
+        return fieldError.getField() + ": " + fieldError.getDefaultMessage();
     }
 }
