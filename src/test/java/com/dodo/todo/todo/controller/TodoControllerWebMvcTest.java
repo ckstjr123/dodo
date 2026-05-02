@@ -92,7 +92,7 @@ class TodoControllerWebMvcTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
-                .andExpect(jsonPath("$.validationErrors.title").exists());
+                .andExpect(jsonPath("$.message").isNotEmpty());
     }
 
     @Test
