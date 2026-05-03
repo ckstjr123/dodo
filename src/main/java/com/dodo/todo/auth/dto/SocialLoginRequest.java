@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 
 @Schema(description = "소셜 로그인 요청")
 public record SocialLoginRequest(
-        @Schema(description = "소셜 로그인 제공자", example = "GOOGLE", allowableValues = {"GOOGLE"})
+        @Schema(description = "소셜 로그인 제공자", example = "google", allowableValues = {"google"})
         @NotBlank
         String provider,
 
