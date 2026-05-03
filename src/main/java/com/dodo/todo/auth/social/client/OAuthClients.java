@@ -15,9 +15,10 @@ public class OAuthClients {
     private final List<OAuthClient> clients;
 
     /**
-     * 소셜 제공자를 지원하는 OAuth 클라이언트로 인증을 위임한다.
+     * 소셜 인증 위임
+     * 제공자를 지원하는 OAuth 클라이언트로 access token 검증을 위임한다.
      */
-    public OAuthUserInfo authenticate(SocialProvider provider, String authorizationCode, String redirectUri) {
+    public OAuthUserInfo authenticate(SocialProvider provider, String accessToken) {
         OAuthClient client = clients.stream()
                 .filter(oAuthClient -> oAuthClient.supports(provider))
                 .findFirst()
@@ -27,6 +28,6 @@ public class OAuthClients {
                         "Unsupported social provider"
                 ));
 
-        return client.authenticate(authorizationCode, redirectUri);
+        return client.authenticate(accessToken);
     }
 }

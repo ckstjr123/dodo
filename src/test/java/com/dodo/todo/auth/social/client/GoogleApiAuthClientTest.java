@@ -3,7 +3,6 @@ package com.dodo.todo.auth.social.client;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.ExpectedCount.once;
-import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -27,23 +26,18 @@ class GoogleApiAuthClientTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
-    @DisplayName("authorization code를 Google에 검증하고 사용자 정보를 반환한다")
+    @DisplayName("Google access token으로 사용자 정보를 조회한다")
     void authenticateReturnsOAuthUserInfo() throws Exception {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate, "client-id", "client-secret");
-
-        server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_TOKEN_URL))
-                .andExpect(method(HttpMethod.POST))
-                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_FORM_URLENCODED))
-                .andRespond(withSuccess(toJson(tokenResponse()), MediaType.APPLICATION_JSON));
+        GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate);
 
         server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_USER_INFO_URL))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer google-access-token"))
-                .andRespond(withSuccess(toJson(userInfoResponse()), MediaType.APPLICATION_JSON));
+                .andRespond(withSuccess(objectMapper.writeValueAsString(userInfoResponse()), MediaType.APPLICATION_JSON));
 
-        var userInfo = client.authenticate("google-code", "http://localhost:5173/auth/callback");
+        var userInfo = client.authenticate("google-access-token");
 
         assertThat(userInfo.provider()).isEqualTo(SocialProvider.GOOGLE);
         assertThat(userInfo.providerUserId()).isEqualTo("google-123");
@@ -53,23 +47,20 @@ class GoogleApiAuthClientTest {
     }
 
     @Test
-    @DisplayName("Google token 교환이 실패하면 RestTemplate 예외를 전파한다")
+    @DisplayName("Google userinfo 조회가 실패하면 RestTemplate 예외를 전달한다")
     void authenticateThrowsRestClientExceptionWhenGoogleCallFails() {
         RestTemplate restTemplate = new RestTemplate();
         MockRestServiceServer server = MockRestServiceServer.bindTo(restTemplate).build();
-        GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate, "client-id", "client-secret");
+        GoogleApiAuthClient client = new GoogleApiAuthClient(restTemplate);
 
-        server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_TOKEN_URL))
-                .andExpect(method(HttpMethod.POST))
+        server.expect(once(), requestTo(GoogleApiAuthClient.GOOGLE_USER_INFO_URL))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer bad-access-token"))
                 .andRespond(withUnauthorizedRequest());
 
-        assertThatThrownBy(() -> client.authenticate("bad-code", "http://localhost:5173/auth/callback"))
+        assertThatThrownBy(() -> client.authenticate("bad-access-token"))
                 .isInstanceOf(HttpClientErrorException.Unauthorized.class);
         server.verify();
-    }
-
-    private GoogleApiAuthClient.GoogleTokenResponse tokenResponse() {
-        return new GoogleApiAuthClient.GoogleTokenResponse("google-access-token");
     }
 
     private GoogleApiAuthClient.GoogleUserInfoResponse userInfoResponse() {
@@ -80,7 +71,4 @@ class GoogleApiAuthClientTest {
         );
     }
 
-    private String toJson(Object value) throws JsonProcessingException {
-        return objectMapper.writeValueAsString(value);
-    }
 }

@@ -1,0 +1,14 @@
+.git
+.gradle
+.idea
+.vscode
+build
+out
+bin
+*.iml
+
+src/main/resources/application.properties
+
+.env
+.env.*
+!.env.example

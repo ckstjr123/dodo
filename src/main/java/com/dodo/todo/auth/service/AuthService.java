@@ -32,9 +32,13 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final OAuthClients oAuthClients;
 
+    /**
+     * 소셜 로그인
+     * 소셜 access token으로 사용자 정보를 검증하고 서비스 JWT를 발급한다.
+     */
     public TokenResponse login(SocialLoginRequest request) {
         SocialProvider provider = SocialProvider.from(request.provider());
-        OAuthUserInfo userInfo = oAuthClients.authenticate(provider, request.authorizationCode(), request.redirectUri());
+        OAuthUserInfo userInfo = oAuthClients.authenticate(provider, request.accessToken());
         validateOAuthUserInfo(userInfo);
 
         return completeLogin(userInfo);
