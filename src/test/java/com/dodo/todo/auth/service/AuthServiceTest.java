@@ -58,13 +58,12 @@ class AuthServiceTest {
         String email = "google@example.com";
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
-                "google-code",
-                "http://localhost:5173/auth/callback"
+                "google-access-token"
         );
         Member member = createMember(memberId, email);
         OAuthUserInfo userInfo = new OAuthUserInfo(SocialProvider.GOOGLE, "google-123", email, true);
 
-        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
+        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.accessToken()))
                 .thenReturn(userInfo);
         when(memberRepository.findByEmail(email)).thenReturn(Optional.of(member));
 
@@ -82,13 +81,12 @@ class AuthServiceTest {
         String email = "new-google@example.com";
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
-                "google-code",
-                "http://localhost:5173/auth/callback"
+                "google-access-token"
         );
         OAuthUserInfo userInfo = new OAuthUserInfo(SocialProvider.GOOGLE, "google-123", email, true);
         Member savedMember = createMember(memberId, email);
 
-        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
+        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.accessToken()))
                 .thenReturn(userInfo);
         when(memberRepository.save(any())).thenReturn(savedMember);
 
@@ -105,12 +103,11 @@ class AuthServiceTest {
         String expectedMessage = "Social account email is not verified";
         SocialLoginRequest request = new SocialLoginRequest(
                 "GOOGLE",
-                "google-code",
-                "http://localhost:5173/auth/callback"
+                "google-access-token"
         );
         OAuthUserInfo userInfo = new OAuthUserInfo(SocialProvider.GOOGLE, "google-123", "google@example.com", false);
 
-        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.authorizationCode(), request.redirectUri()))
+        when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.accessToken()))
                 .thenReturn(userInfo);
 
         assertThatThrownBy(() -> authService.login(request))
@@ -124,8 +121,7 @@ class AuthServiceTest {
         String expectedMessage = "Unsupported social provider";
         SocialLoginRequest request = new SocialLoginRequest(
                 "UNKNOWN",
-                "google-code",
-                "http://localhost:5173/auth/callback"
+                "google-access-token"
         );
 
         assertThatThrownBy(() -> authService.login(request))

@@ -32,14 +32,9 @@ class OAuthClientsTest {
         );
 
         when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(true);
-        when(oAuthClient.authenticate("google-code", "http://localhost:5173/auth/callback"))
-                .thenReturn(userInfo);
+        when(oAuthClient.authenticate("google-access-token")).thenReturn(userInfo);
 
-        OAuthUserInfo response = oAuthClients.authenticate(
-                SocialProvider.GOOGLE,
-                "google-code",
-                "http://localhost:5173/auth/callback"
-        );
+        OAuthUserInfo response = oAuthClients.authenticate(SocialProvider.GOOGLE, "google-access-token");
 
         assertThat(response).isEqualTo(userInfo);
     }
@@ -51,11 +46,7 @@ class OAuthClientsTest {
 
         when(oAuthClient.supports(SocialProvider.GOOGLE)).thenReturn(false);
 
-        assertThatThrownBy(() -> oAuthClients.authenticate(
-                SocialProvider.GOOGLE,
-                "google-code",
-                "http://localhost:5173/auth/callback"
-        ))
+        assertThatThrownBy(() -> oAuthClients.authenticate(SocialProvider.GOOGLE, "google-access-token"))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage("Unsupported social provider");
     }

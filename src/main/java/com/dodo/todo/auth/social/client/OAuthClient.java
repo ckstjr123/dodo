@@ -7,5 +7,5 @@ public interface OAuthClient {
 
     boolean supports(SocialProvider provider);
 
-    OAuthUserInfo authenticate(String authorizationCode, String redirectUri);
+    OAuthUserInfo authenticate(String accessToken);
 }
