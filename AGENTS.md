@@ -16,6 +16,10 @@
   - Vue Router
   - Pinia
 
+## Commands
+- `./gradlew build`
+- `./gradlew test`
+
 ## Source of Truth
 - Database schema migrations: `src/main/resources/db/migration`
 - Functional specification: `docs/features.md`
