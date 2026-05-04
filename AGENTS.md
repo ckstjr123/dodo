@@ -10,7 +10,7 @@
   - Spring Boot
   - Spring Data JPA
   - MySQL
-- Frontend delivery:
+- Frontend:
   - Vue.js
   - Vite
   - Vue Router
@@ -23,6 +23,7 @@
 ## Source of Truth
 - Database schema migrations: `src/main/resources/db/migration`
 - Functional specification: `docs/features.md`
+- Deployment: `docs/deployment.md`
 
 ## Architecture
 - The project targets a monolithic architecture.
@@ -263,21 +264,6 @@ HAVING COUNT(m) > 5
 - Commit messages must follow the Conventional Commits format.
 - Use types such as `feat`, `fix`, `refactor`, `test`, `docs`, and `chore` appropriately.
 - Write the commit message description in Korean.
-
-## Deployment Strategy
-- Keep production deployment simple for the current project size.
-- Use a single Spring Boot application instance unless concrete scaling needs appear.
-- Package the application with Docker for consistent runtime and deployment.
-- For AWS, start with one EC2 instance for the application.
-- For production data, prefer AWS RDS MySQL over running MySQL in a container on the same EC2 instance.
-- Pass runtime configuration through environment variables or deployment secrets, not committed property files.
-- If HTTPS or custom domain setup is needed, place Nginx or another reverse proxy in front of the app on the EC2 instance.
-
-## Deployment Boundaries
-- Production:
-  - Run the Spring Boot app as a Docker container.
-  - Keep the database outside the app container and treat it as persistent infrastructure.
-  - Avoid introducing distributed systems, multiple app nodes, or container orchestration before real traffic or operational needs justify them.
 
 ## Notes
 - `src/main/resources/application.properties` is intended for local or deployment-specific runtime values and should remain ignored by Git.

@@ -1,0 +1,11 @@
+# .geminiignore
+.gradle/
+build/
+bin/
+out/
+.idea/
+.settings/
+.project
+.classpath
+*.class
+*.jar
