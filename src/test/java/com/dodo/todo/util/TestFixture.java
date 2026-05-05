@@ -28,6 +28,12 @@ public final class TestFixture {
         return Category.create(member, name);
     }
 
+    public static Category createCategory(Long id, Member member, String name) {
+        Category category = createCategory(member, name);
+        setId(category, id);
+        return category;
+    }
+
     public static Todo createTodo(Member member, Category category, String title) {
         return createTodo(member, category, null, title, TodoStatus.TODO, null);
     }

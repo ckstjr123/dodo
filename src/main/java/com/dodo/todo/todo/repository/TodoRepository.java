@@ -57,4 +57,12 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
             WHERE todo.mainTodo.id = :todoId
             """)
     void deleteSubTodosById(@Param("todoId") Long todoId);
+
+    @Query("""
+            SELECT COUNT(todo) > 0
+            FROM Todo todo
+            WHERE todo.category.id = :categoryId
+              AND todo.member.id = :memberId
+            """)
+    boolean existsByCategoryIdAndMemberId(@Param("categoryId") Long categoryId, @Param("memberId") Long memberId);
 }
