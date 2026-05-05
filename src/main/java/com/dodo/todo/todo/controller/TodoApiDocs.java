@@ -35,4 +35,8 @@ public interface TodoApiDocs {
     @Operation(summary = "Todo 완료 취소")
     @SecurityRequirement(name = "bearerAuth")
     void undoTodo(Long memberId, Long todoId);
+
+    @Operation(summary = "Todo 삭제")
+    @SecurityRequirement(name = "bearerAuth")
+    void deleteTodo(Long memberId, Long todoId);
 }

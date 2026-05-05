@@ -37,6 +37,7 @@ import static com.dodo.todo.util.TestFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -133,7 +134,7 @@ class TodoServiceTest {
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
-        todoService.completeTodo(memberId, todoId);
+        todoService.completeTodo(todoId, memberId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.DONE);
         verify(todoHistoryRepository).save(any(TodoHistory.class));
@@ -162,7 +163,7 @@ class TodoServiceTest {
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
-        todoService.completeTodo(memberId, todoId);
+        todoService.completeTodo(todoId, memberId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
         assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate.plusDays(1));
@@ -192,7 +193,7 @@ class TodoServiceTest {
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
-        todoService.completeTodo(memberId, todoId);
+        todoService.completeTodo(todoId, memberId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.DONE);
     }
@@ -219,7 +220,7 @@ class TodoServiceTest {
 
         when(todoRepository.findWithSubTodos(todoId, memberId)).thenReturn(Optional.of(todo));
 
-        todoService.undoTodo(memberId, todoId);
+        todoService.undoTodo(todoId, memberId);
 
         assertThat(todo.getStatus()).isEqualTo(TodoStatus.TODO);
     }
@@ -236,10 +237,41 @@ class TodoServiceTest {
 
         when(todoRepository.findWithSubTodos(subTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
-        todoService.undoTodo(memberId, subTodoId);
+        todoService.undoTodo(subTodoId, memberId);
 
         assertThat(mainTodo.getStatus()).isEqualTo(TodoStatus.TODO);
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
+    }
+
+    @Test
+    @DisplayName("Todo를 삭제하면 하위 Todo를 먼저 삭제하고 해당 Todo를 삭제한다")
+    void deleteTodoDeletesSubTodosFirst() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
+
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+
+        todoService.deleteTodo(todoId, memberId);
+
+        var inOrder = inOrder(todoRepository);
+        inOrder.verify(todoRepository).deleteSubTodosById(todoId);
+        inOrder.verify(todoRepository).deleteById(todoId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 소유가 아닌 Todo는 삭제할 수 없다")
+    void deleteTodoRejectsNotFoundTodo() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> todoService.deleteTodo(todoId, memberId))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(TodoError.TODO_NOT_FOUND.message());
     }
 
     @Test
@@ -261,7 +293,7 @@ class TodoServiceTest {
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(updatedCategory));
 
-        todoService.updateTodo(memberId, todoId, request);
+        todoService.updateTodo(todoId, memberId, request);
 
         assertThat(todo.getCategory()).isSameAs(updatedCategory);
         assertThat(todo.getTitle()).isEqualTo("updated title");
@@ -280,8 +312,8 @@ class TodoServiceTest {
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> todoService.updateTodo(
-                memberId,
                 todoId,
+                memberId,
                 createTodoUpdateRequest(10L, LocalDate.of(2026, 4, 8), null)
         ))
                 .isInstanceOf(BusinessException.class)
@@ -304,8 +336,8 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(foreignCategory));
 
         assertThatThrownBy(() -> todoService.updateTodo(
-                memberId,
                 todoId,
+                memberId,
                 createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), null)
         ))
                 .isInstanceOf(BusinessException.class)
