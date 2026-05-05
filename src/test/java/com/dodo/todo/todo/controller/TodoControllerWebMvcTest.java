@@ -3,6 +3,7 @@ package com.dodo.todo.todo.controller;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -13,7 +14,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
+import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.recurrencerule.Day;
 import com.dodo.todo.recurrencerule.Frequency;
@@ -26,6 +29,7 @@ import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
 import com.dodo.todo.todo.dto.TodoRecurrenceResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
+import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.service.TodoService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
@@ -69,7 +73,7 @@ class TodoControllerWebMvcTest {
     void createTodoReturnsCreatedResponse() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        TodoRequest request = createMonthlyRecurringTodoRequest();
+        TodoRequest request = createTodoRequest(LocalDate.of(2026, 5, 7));
         when(todoService.saveTodo(eq(memberId), any(TodoRequest.class))).thenReturn(todoId);
         authenticate(memberId);
 
@@ -84,7 +88,17 @@ class TodoControllerWebMvcTest {
     @DisplayName("Todo 생성 요청 검증 실패 시 오류를 반환한다")
     void createTodoReturnsValidationError() throws Exception {
         Long memberId = 5L;
-        TodoRequest request = createBlankTitleTodoRequest();
+        TodoRequest request = new TodoRequest(
+                10L,
+                null,
+                "",
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos")
@@ -123,6 +137,36 @@ class TodoControllerWebMvcTest {
                 .andExpect(jsonPath("$.todoId").value(todoId))
                 .andExpect(jsonPath("$.title").value("보고서 작성"))
                 .andExpect(jsonPath("$.subTodos[0].title").value("초안 작성"));
+    }
+
+    @Test
+    @DisplayName("Todo 수정 요청은 204를 반환한다")
+    void updateTodoReturnsNoContent() throws Exception {
+        Long memberId = 5L;
+        Long todoId = 7L;
+        TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.of(2026, 5, 7));
+        doNothing().when(todoService).updateTodo(eq(memberId), eq(todoId), any(TodoUpdateRequest.class));
+        authenticate(memberId);
+
+        mockMvc.perform(patch("/api/v1/todos/{todoId}", todoId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("반복 Todo 수정 요청에 scheduledDate가 없으면 400을 반환한다")
+    void updateRecurringTodoReturnsValidationErrorWithoutScheduledDate() throws Exception {
+        Long memberId = 5L;
+        doThrow(new BusinessException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED))
+                .when(todoService)
+                .updateTodo(eq(memberId), eq(7L), any(TodoUpdateRequest.class));
+        authenticate(memberId);
+
+        mockMvc.perform(patch("/api/v1/todos/{todoId}", 7L)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(createTodoUpdateRequest(null))))
+                .andExpect(status().isBadRequest());
     }
 
     @Test
@@ -168,7 +212,7 @@ class TodoControllerWebMvcTest {
         );
     }
 
-    private TodoRequest createMonthlyRecurringTodoRequest() {
+    private TodoRequest createTodoRequest(LocalDate scheduledDate) {
         return new TodoRequest(
                 10L,
                 null,
@@ -176,32 +220,35 @@ class TodoControllerWebMvcTest {
                 "초안부터 작성",
                 1,
                 LocalDateTime.of(2026, 4, 7, 18, 0),
-                LocalDate.of(2026, 5, 7),
+                scheduledDate,
                 LocalTime.of(14, 0),
-                new TodoRecurrenceRequest(
-                        new RecurrenceRuleRequest(
-                                Frequency.MONTHLY,
-                                1,
-                                new ByDayRequest(1, List.of(Day.MO)),
-                                null,
-                                null
-                        ),
-                        RecurrenceCriteria.SCHEDULED_DATE
-                )
+                createTodoRecurrenceRequest()
         );
     }
 
-    private TodoRequest createBlankTitleTodoRequest() {
-        return new TodoRequest(
+    private TodoUpdateRequest createTodoUpdateRequest(LocalDate scheduledDate) {
+        return new TodoUpdateRequest(
                 10L,
-                null,
-                "",
-                null,
-                null,
-                null,
-                null,
-                null,
-                null
+                "보고서 작성",
+                "초안부터 작성",
+                1,
+                LocalDateTime.of(2026, 4, 7, 18, 0),
+                scheduledDate,
+                LocalTime.of(14, 0),
+                createTodoRecurrenceRequest()
+        );
+    }
+
+    private TodoRecurrenceRequest createTodoRecurrenceRequest() {
+        return new TodoRecurrenceRequest(
+                new RecurrenceRuleRequest(
+                        Frequency.MONTHLY,
+                        1,
+                        new ByDayRequest(1, List.of(Day.MO)),
+                        null,
+                        null
+                ),
+                RecurrenceCriteria.SCHEDULED_DATE
         );
     }
 

@@ -2,6 +2,7 @@ package com.dodo.todo.todo.domain;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.common.entity.BaseEntity;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrenceConverter;
@@ -92,7 +93,7 @@ public class Todo extends BaseEntity {
             TodoRecurrence recurrence
     ) {
         if (mainTodo != null && !mainTodo.isOwnedBy(member)) {
-            throw new IllegalArgumentException(TodoError.MAIN_TODO_NOT_OWNED.message());
+            throw new BusinessException(TodoError.MAIN_TODO_NOT_OWNED);
         }
         validateStatus(status);
         validateRecurrenceSchedule(recurrence, scheduledDate);
@@ -142,16 +143,42 @@ public class Todo extends BaseEntity {
     }
 
     /**
+     * Todo 기본 정보를 수정한다.
+     * 완료 상태와 완료 시각은 완료/취소 기능에서만 변경한다.
+     */
+    public void updateDetails(
+            Category category,
+            String title,
+            String memo,
+            Integer sortOrder,
+            LocalDateTime dueAt,
+            LocalDate scheduledDate,
+            LocalTime scheduledTime,
+            TodoRecurrence recurrence
+    ) {
+        validateRecurrenceSchedule(recurrence, scheduledDate);
+
+        this.category = category;
+        this.title = title;
+        this.memo = memo;
+        this.sortOrder = sortOrder == null ? 0 : sortOrder;
+        this.dueAt = dueAt;
+        this.scheduledDate = scheduledDate;
+        this.scheduledTime = scheduledTime;
+        this.recurrence = recurrence;
+    }
+
+    /**
      * 완료 처리한다.
      * 반복 Todo는 다음 반복일이 있으면 scheduledDate를 이동하고, 없으면 DONE으로 변경한다.
      * 반복 mainTodo의 다음 회차가 있으면 subTodo를 TODO로 초기화하고, 영구 완료되면 함께 DONE으로 변경한다.
      */
     public void complete(LocalDateTime completedAt) {
         if (status == TodoStatus.DONE) {
-            throw new IllegalStateException(TodoError.TODO_ALREADY_COMPLETED.message());
+            throw new BusinessException(TodoError.TODO_ALREADY_COMPLETED);
         }
         if (completedAt == null) {
-            throw new IllegalArgumentException(TodoError.COMPLETED_DATE_REQUIRED.message());
+            throw new BusinessException(TodoError.COMPLETED_DATE_REQUIRED);
         }
 
         nextDate(completedAt).ifPresentOrElse(
@@ -179,7 +206,7 @@ public class Todo extends BaseEntity {
      */
     public void undo() {
         if (status != TodoStatus.DONE) {
-            throw new IllegalStateException(TodoError.TODO_NOT_COMPLETED.message());
+            throw new BusinessException(TodoError.TODO_NOT_COMPLETED);
         }
 
         setStatus(TodoStatus.TODO);
@@ -213,13 +240,13 @@ public class Todo extends BaseEntity {
 
     private void validateStatus(TodoStatus status) {
         if (status == null) {
-            throw new IllegalArgumentException(TodoError.TODO_STATUS_REQUIRED.message());
+            throw new BusinessException(TodoError.TODO_STATUS_REQUIRED);
         }
     }
 
     private void validateRecurrenceSchedule(TodoRecurrence recurrence, LocalDate scheduledDate) {
         if (recurrence != null && scheduledDate == null) {
-            throw new IllegalArgumentException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
+            throw new BusinessException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED);
         }
     }
 }

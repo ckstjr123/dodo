@@ -13,6 +13,7 @@ import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
+import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
 import java.time.LocalDateTime;
@@ -69,6 +70,29 @@ public class TodoService {
         return TodoResponse.from(todo);
     }
 
+    /**
+     * Todo 기본 정보를 수정한다.
+     * 상태와 완료 이력은 별도 완료/취소 기능에서만 변경한다.
+     */
+    @Transactional
+    public void updateTodo(Long memberId, Long todoId, TodoUpdateRequest request) {
+        Member member = memberService.findById(memberId);
+        Todo todo = findTodo(memberId, todoId);
+        Category category = findCategory(member, request.categoryId());
+        TodoRecurrence recurrence = request.getRecurrence();
+
+        todo.updateDetails(
+                category,
+                request.title(),
+                request.memo(),
+                request.sortOrder(),
+                request.dueAt(),
+                request.scheduledDate(),
+                request.scheduledTime(),
+                recurrence
+        );
+    }
+
     @Transactional
     public void completeTodo(Long memberId, Long todoId) {
         Todo todo = findTodoWithSubTodos(memberId, todoId);
@@ -107,6 +131,11 @@ public class TodoService {
         }
 
         return todo;
+    }
+
+    private Todo findTodo(Long memberId, Long todoId) {
+        return todoRepository.findByIdAndMemberId(todoId, memberId)
+                .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
     }
 
     private Todo findTodoWithSubTodos(Long memberId, Long todoId) {

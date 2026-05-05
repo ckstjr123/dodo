@@ -1,6 +1,8 @@
 package com.dodo.todo.todo.domain.recurrence;
 
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.recurrencerule.RecurrenceRule;
+import com.dodo.todo.todo.domain.TodoError;
 import java.time.LocalDate;
 import java.util.Optional;
 
@@ -11,7 +13,7 @@ public record TodoRecurrence(
 
     public TodoRecurrence {
         if (rule == null) {
-            throw new IllegalArgumentException("Recurrence rule is required");
+            throw new BusinessException(TodoError.RECURRENCE_RULE_REQUIRED);
         }
         if (criteria == null) {
             criteria = RecurrenceCriteria.SCHEDULED_DATE;
@@ -24,7 +26,7 @@ public record TodoRecurrence(
     public Optional<LocalDate> nextDate(LocalDate scheduledDate, LocalDate completedDate) {
         if (criteria == RecurrenceCriteria.COMPLETED_DATE) {
             if (scheduledDate.isAfter(completedDate)) {
-                throw new IllegalStateException("Completion-based recurring todos cannot be completed until the actual date arrives");
+                throw new BusinessException(TodoError.COMPLETION_BASED_RECURRING_TODO_NOT_DUE);
             }
             return rule.getNextDate(completedDate);
         }

@@ -18,6 +18,7 @@ import com.dodo.todo.todo.dto.ByDayRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
 import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
 import com.dodo.todo.todo.dto.TodoRequest;
+import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
 import org.junit.jupiter.api.DisplayName;
@@ -68,7 +69,10 @@ class TodoServiceTest {
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
 
-        assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, null, null)))
+        assertThatThrownBy(() -> todoService.saveTodo(
+                memberId,
+                createTodoRequest(categoryId, null, LocalDate.of(2026, 4, 7), null)
+        ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.CATEGORY_NOT_FOUND.message());
     }
@@ -87,7 +91,10 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
         when(todoRepository.save(any(Todo.class))).thenReturn(savedTodo);
 
-        Long todoId = todoService.saveTodo(memberId, createTodoRequest(categoryId, null, null));
+        Long todoId = todoService.saveTodo(
+                memberId,
+                createTodoRequest(categoryId, null, LocalDate.of(2026, 4, 7), null)
+        );
 
         assertThat(todoId).isEqualTo(savedTodoId);
     }
@@ -107,7 +114,10 @@ class TodoServiceTest {
         when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
         when(todoRepository.findByIdAndMemberId(mainTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
-        assertThatThrownBy(() -> todoService.saveTodo(memberId, createTodoRequest(categoryId, mainTodoId, null)))
+        assertThatThrownBy(() -> todoService.saveTodo(
+                memberId,
+                createTodoRequest(categoryId, mainTodoId, LocalDate.of(2026, 4, 7), null)
+        ))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.TODO_DEPTH_LIMIT_EXCEEDED.message());
     }
@@ -232,7 +242,82 @@ class TodoServiceTest {
         assertThat(subTodo.getStatus()).isEqualTo(TodoStatus.TODO);
     }
 
-    private TodoRequest createTodoRequest(Long categoryId, Long mainTodoId, TodoRecurrence recurrence) {
+    @Test
+    @DisplayName("Todo 기본 정보를 수정한다")
+    void updateTodoSuccess() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Long categoryId = 10L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        Category updatedCategory = createCategory(member, "private");
+        Todo todo = createTodo(todoId, member, category, "before", TodoStatus.TODO);
+        TodoUpdateRequest request = createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), recurrence(
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                RecurrenceCriteria.SCHEDULED_DATE
+        ));
+
+        when(memberService.findById(memberId)).thenReturn(member);
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(updatedCategory));
+
+        todoService.updateTodo(memberId, todoId, request);
+
+        assertThat(todo.getCategory()).isSameAs(updatedCategory);
+        assertThat(todo.getTitle()).isEqualTo("updated title");
+        assertThat(todo.getMemo()).isEqualTo("updated memo");
+        assertThat(todo.getScheduledDate()).isEqualTo(LocalDate.of(2026, 4, 8));
+        assertThat(todo.getRecurrence()).isEqualTo(request.getRecurrence());
+    }
+
+    @Test
+    @DisplayName("다른 회원의 Todo는 수정할 수 없다")
+    void updateTodoRejectsForeignTodo() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+
+        when(memberService.findById(memberId)).thenReturn(createMember(memberId));
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> todoService.updateTodo(
+                memberId,
+                todoId,
+                createTodoUpdateRequest(10L, LocalDate.of(2026, 4, 8), null)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(TodoError.TODO_NOT_FOUND.message());
+    }
+
+    @Test
+    @DisplayName("다른 회원 카테고리로 Todo를 수정할 수 없다")
+    void updateTodoRejectsForeignCategory() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Long categoryId = 10L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        Category foreignCategory = createCategory(Member.of("other@example.com"), "private");
+        Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
+
+        when(memberService.findById(memberId)).thenReturn(member);
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(foreignCategory));
+
+        assertThatThrownBy(() -> todoService.updateTodo(
+                memberId,
+                todoId,
+                createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), null)
+        ))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(TodoError.CATEGORY_NOT_FOUND.message());
+    }
+
+    private TodoRequest createTodoRequest(
+            Long categoryId,
+            Long mainTodoId,
+            LocalDate scheduledDate,
+            TodoRecurrence recurrence
+    ) {
         return new TodoRequest(
                 categoryId,
                 mainTodoId,
@@ -240,8 +325,25 @@ class TodoServiceTest {
                 "memo",
                 1,
                 LocalDateTime.of(2026, 4, 7, 18, 0),
-                LocalDate.of(2026, 4, 7),
+                scheduledDate,
                 LocalTime.of(14, 0),
+                createTodoRecurrenceRequest(recurrence)
+        );
+    }
+
+    private TodoUpdateRequest createTodoUpdateRequest(
+            Long categoryId,
+            LocalDate scheduledDate,
+            TodoRecurrence recurrence
+    ) {
+        return new TodoUpdateRequest(
+                categoryId,
+                "updated title",
+                "updated memo",
+                2,
+                LocalDateTime.of(2026, 4, 8, 18, 0),
+                scheduledDate,
+                LocalTime.of(15, 0),
                 createTodoRecurrenceRequest(recurrence)
         );
     }

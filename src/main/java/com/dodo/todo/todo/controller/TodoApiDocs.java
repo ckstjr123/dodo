@@ -4,6 +4,7 @@ import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoCreateResponse;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoResponse;
+import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,10 @@ public interface TodoApiDocs {
     @Operation(summary = "Todo 단건 조회")
     @SecurityRequirement(name = "bearerAuth")
     TodoResponse getTodo(Long memberId, Long todoId);
+
+    @Operation(summary = "Todo 수정")
+    @SecurityRequirement(name = "bearerAuth")
+    void updateTodo(Long memberId, Long todoId, TodoUpdateRequest request);
 
     @Operation(summary = "Todo 완료")
     @SecurityRequirement(name = "bearerAuth")
