@@ -262,7 +262,7 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않거나 소유가 아닌 Todo는 삭제할 수 없다")
+    @DisplayName("존재하지 않거나 소유자가 다른 Todo는 삭제할 수 없다")
     void deleteTodoRejectsNotFoundTodo() {
         Long memberId = 1L;
         Long todoId = 7L;

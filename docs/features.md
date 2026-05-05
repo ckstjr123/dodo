@@ -14,6 +14,19 @@
 - 태그 기능과 priority 기능은 사용하지 않는다.
 - 응답 DTO의 식별자 필드는 엔티티명을 포함한 형식(`todoId`, `memberId`, `historyId`)으로 통일한다.
 
+## Category
+
+- Category API는 `POST /api/v1/categories`, `GET /api/v1/categories`, `PATCH /api/v1/categories/{categoryId}`, `DELETE /api/v1/categories/{categoryId}`를 제공한다.
+- 생성 요청 필드는 `name`이며 필수값이고 최대 길이는 100자다.
+- 생성 시 현재 회원에게 동일한 이름의 카테고리가 이미 있으면 새로 생성하지 않고 기존 `categoryId`를 반환한다.
+- 목록 조회는 현재 회원이 소유한 카테고리만 반환하고, `createdAt ASC`, `id ASC` 순서로 정렬한다.
+- 수정 대상 카테고리는 현재 회원이 소유한 카테고리여야 한다.
+- 수정 시 같은 카테고리를 같은 이름으로 수정하면 성공 처리한다.
+- 수정 시 같은 회원의 다른 카테고리와 이름이 중복되면 `CATEGORY_DUPLICATED` 오류를 반환한다.
+- 삭제 대상 카테고리는 현재 회원이 소유한 카테고리여야 한다.
+- Todo가 연결된 카테고리는 삭제할 수 없고 `CATEGORY_IN_USE` 오류를 반환한다.
+- 카테고리는 물리 삭제하며 DB unique 제약은 사용하지 않는다.
+
 ## Todo Create
 
 - 생성 요청 필드: `categoryId`, `parentTodoId(mainTodoId)`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrence`
