@@ -1,6 +1,7 @@
 package com.dodo.todo.todo.domain;
 
 import com.dodo.todo.category.domain.Category;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.recurrencerule.Day;
 import com.dodo.todo.recurrencerule.Frequency;
@@ -15,6 +16,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.List;
 
@@ -80,7 +82,7 @@ class TodoTest {
                 .title("sub")
                 .status(TodoStatus.TODO)
                 .build())
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.MAIN_TODO_NOT_OWNED.message());
     }
 
@@ -107,7 +109,7 @@ class TodoTest {
                 .build();
 
         assertThatThrownBy(() -> todo.complete(COMPLETED_AT))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.TODO_ALREADY_COMPLETED.message());
     }
 
@@ -127,7 +129,7 @@ class TodoTest {
                         RecurrenceCriteria.SCHEDULED_DATE
                 ))
                 .build())
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
     }
 
@@ -203,7 +205,7 @@ class TodoTest {
         );
 
         assertThatThrownBy(() -> todo.complete(LocalDateTime.of(2026, 4, 29, 12, 0)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(BusinessException.class);
     }
 
     @Test
@@ -469,8 +471,58 @@ class TodoTest {
         Todo todo = todo(Member.of("member@example.com"));
 
         assertThatThrownBy(todo::undo)
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(BusinessException.class)
                 .hasMessage(TodoError.TODO_NOT_COMPLETED.message());
+    }
+
+    @Test
+    @DisplayName("Todo 기본 정보를 수정한다")
+    void updateDetails() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Category updatedCategory = Category.create(member, "private");
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("before")
+                .status(TodoStatus.TODO)
+                .build();
+        LocalDate scheduledDate = LocalDate.of(2026, 5, 7);
+        LocalDateTime dueAt = LocalDateTime.of(2026, 5, 7, 18, 0);
+        LocalTime scheduledTime = LocalTime.of(14, 0);
+        TodoRecurrence recurrence = recurrence(
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
+
+        todo.updateDetails(updatedCategory, "after", "memo", 10, dueAt, scheduledDate, scheduledTime, recurrence);
+
+        assertAll(
+                () -> assertThat(todo.getCategory()).isSameAs(updatedCategory),
+                () -> assertThat(todo.getTitle()).isEqualTo("after"),
+                () -> assertThat(todo.getMemo()).isEqualTo("memo"),
+                () -> assertThat(todo.getSortOrder()).isEqualTo(10),
+                () -> assertThat(todo.getDueAt()).isEqualTo(dueAt),
+                () -> assertThat(todo.getScheduledDate()).isEqualTo(scheduledDate),
+                () -> assertThat(todo.getScheduledTime()).isEqualTo(scheduledTime),
+                () -> assertThat(todo.getRecurrence()).isEqualTo(recurrence)
+        );
+    }
+
+    @Test
+    @DisplayName("수정할 반복 Todo에 scheduledDate가 없으면 예외가 발생한다")
+    void rejectUpdateRecurringTodoWithoutScheduledDate() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo todo = todo(member);
+        TodoRecurrence recurrence = recurrence(
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
+
+        assertThatThrownBy(() -> todo.updateDetails(category, "title", null, null, null, null, null, recurrence))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
     }
 
     private Todo todo(Member member) {

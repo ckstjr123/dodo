@@ -13,6 +13,12 @@ public enum TodoError implements ErrorCode {
     COMPLETED_DATE_REQUIRED("COMPLETED_DATE_REQUIRED", 400, "Completed date is required"),
     TODO_NOT_COMPLETED("TODO_NOT_COMPLETED", 400, "Todo is not completed"),
     TODO_STATUS_REQUIRED("TODO_STATUS_REQUIRED", 400, "Todo status is required"),
+    RECURRENCE_RULE_REQUIRED("RECURRENCE_RULE_REQUIRED", 400, "Recurrence rule is required"),
+    COMPLETION_BASED_RECURRING_TODO_NOT_DUE(
+            "COMPLETION_BASED_RECURRING_TODO_NOT_DUE",
+            400,
+            "Completion-based recurring todos cannot be completed until the actual date arrives"
+    ),
     RECURRING_TODO_SCHEDULED_DATE_REQUIRED(
             "RECURRING_TODO_SCHEDULED_DATE_REQUIRED",
             400,

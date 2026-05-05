@@ -25,6 +25,22 @@
 - `recurrence`가 없는 Todo는 `scheduledDate`가 선택 값이다.
 - `recurrence`가 있는 Todo는 `scheduledDate`가 필수다.
 
+## Todo Update
+
+- 수정 API는 `PATCH /api/v1/todos/{todoId}`를 사용한다.
+- 수정 요청 필드: `categoryId`, `title`, `memo`, `sortOrder`, `dueAt`, `scheduledDate`, `scheduledTime`, `recurrence`
+- `parentTodoId`와 `subTodos`는 수정 요청 필드에 포함하지 않는다.
+- `status`, `completedAt`은 완료/취소 API에서만 변경한다.
+- `TodoHistory`는 완료 시점의 이력 snapshot이므로 수정 API에서 변경하지 않는다.
+- 수정 대상 Todo는 현재 회원이 소유한 Todo여야 한다.
+- `categoryId`는 현재 회원이 소유한 카테고리만 허용한다.
+- `categoryId`, `title`은 필수다.
+- `title` 최대 길이는 200자다.
+- `memo` 최대 길이는 1000자다.
+- `recurrence`가 없는 Todo는 `scheduledDate`가 선택 값이다.
+- `recurrence`가 있는 Todo는 `scheduledDate`가 필수다.
+- `recurrence=null`이면 반복 설정을 제거한다.
+
 ## Recurrence Rule
 
 - 반복 설정은 `recurrence` JSON 컬럼 하나로 저장한다.

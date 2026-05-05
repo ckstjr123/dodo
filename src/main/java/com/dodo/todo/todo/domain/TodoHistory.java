@@ -1,5 +1,6 @@
 package com.dodo.todo.todo.domain;
 
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,16 +49,16 @@ public class TodoHistory {
 
     private TodoHistory(Long todoId, String title, Member member, LocalDateTime completedAt) {
         if (todoId == null) {
-            throw new IllegalArgumentException(TodoHistoryError.TODO_REQUIRED.message());
+            throw new BusinessException(TodoHistoryError.TODO_REQUIRED);
         }
         if (title == null || title.isBlank()) {
-            throw new IllegalArgumentException(TodoHistoryError.TODO_TITLE_REQUIRED.message());
+            throw new BusinessException(TodoHistoryError.TODO_TITLE_REQUIRED);
         }
         if (member == null) {
-            throw new IllegalArgumentException(TodoHistoryError.MEMBER_REQUIRED.message());
+            throw new BusinessException(TodoHistoryError.MEMBER_REQUIRED);
         }
         if (completedAt == null) {
-            throw new IllegalArgumentException(TodoHistoryError.COMPLETED_AT_REQUIRED.message());
+            throw new BusinessException(TodoHistoryError.COMPLETED_AT_REQUIRED);
         }
 
         this.todoId = todoId;
@@ -69,7 +70,7 @@ public class TodoHistory {
     /** 현재 Todo 제목을 사용해 완료 이력을 생성한다. */
     public static TodoHistory create(Todo todo, LocalDateTime completedAt) {
         if (todo == null) {
-            throw new IllegalArgumentException(TodoHistoryError.TODO_REQUIRED.message());
+            throw new BusinessException(TodoHistoryError.TODO_REQUIRED);
         }
 
         return new TodoHistory(todo.getId(), todo.getTitle(), todo.getMember(), completedAt);
