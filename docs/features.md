@@ -4,6 +4,7 @@
 
 - Todo API는 `POST /api/v1/todos`, `GET /api/v1/todos`, `GET /api/v1/todos/{todoId}`를 제공한다.
 - 완료 처리는 `PATCH /api/v1/todos/{todoId}/complete`, `PATCH /api/v1/todos/{todoId}/undo`로 처리한다.
+- 삭제 처리는 `DELETE /api/v1/todos/{todoId}`로 처리한다.
 - 완료 이력은 `GET /api/v1/todos/histories`로 조회한다.
 - Todo 상태는 `TODO`, `DONE`만 사용한다.
 - 메인 목록은 `TODO` 상태의 루트 Todo만 조회한다.
@@ -40,6 +41,17 @@
 - `recurrence`가 없는 Todo는 `scheduledDate`가 선택 값이다.
 - `recurrence`가 있는 Todo는 `scheduledDate`가 필수다.
 - `recurrence=null`이면 반복 설정을 제거한다.
+
+## Todo Delete
+
+- 삭제 API는 `DELETE /api/v1/todos/{todoId}`를 사용한다.
+- 삭제는 물리 삭제로 처리하며 복구 기능은 제공하지 않는다.
+- 삭제 대상 Todo는 현재 회원이 소유한 Todo여야 한다.
+- 완료 여부와 반복 여부와 관계없이 삭제할 수 있다.
+- 메인 Todo를 삭제하면 하위 Todo를 먼저 직접 삭제한 뒤 메인 Todo를 삭제한다.
+- 하위 Todo를 직접 삭제하면 해당 하위 Todo만 삭제한다.
+- 삭제된 Todo의 `TodoHistory`는 삭제하지 않는다.
+- Todo 삭제에 DB `ON DELETE CASCADE`와 JPA remove cascade는 사용하지 않는다.
 
 ## Recurrence Rule
 

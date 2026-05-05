@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -129,7 +130,7 @@ class TodoControllerWebMvcTest {
     void getTodoReturnsTodo() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        when(todoService.getTodo(memberId, todoId)).thenReturn(response(todoId, "보고서 작성"));
+        when(todoService.getTodo(todoId, memberId)).thenReturn(response(todoId, "보고서 작성"));
         authenticate(memberId);
 
         mockMvc.perform(get("/api/v1/todos/{todoId}", todoId))
@@ -145,7 +146,7 @@ class TodoControllerWebMvcTest {
         Long memberId = 5L;
         Long todoId = 7L;
         TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.of(2026, 5, 7));
-        doNothing().when(todoService).updateTodo(eq(memberId), eq(todoId), any(TodoUpdateRequest.class));
+        doNothing().when(todoService).updateTodo(eq(todoId), eq(memberId), any(TodoUpdateRequest.class));
         authenticate(memberId);
 
         mockMvc.perform(patch("/api/v1/todos/{todoId}", todoId)
@@ -160,7 +161,7 @@ class TodoControllerWebMvcTest {
         Long memberId = 5L;
         doThrow(new BusinessException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED))
                 .when(todoService)
-                .updateTodo(eq(memberId), eq(7L), any(TodoUpdateRequest.class));
+                .updateTodo(eq(7L), eq(memberId), any(TodoUpdateRequest.class));
         authenticate(memberId);
 
         mockMvc.perform(patch("/api/v1/todos/{todoId}", 7L)
@@ -174,7 +175,7 @@ class TodoControllerWebMvcTest {
     void completeTodoReturnsNoContent() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        doNothing().when(todoService).completeTodo(memberId, todoId);
+        doNothing().when(todoService).completeTodo(todoId, memberId);
         authenticate(memberId);
 
         mockMvc.perform(patch("/api/v1/todos/{todoId}/complete", todoId))
@@ -186,10 +187,22 @@ class TodoControllerWebMvcTest {
     void undoTodoReturnsNoContent() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        doNothing().when(todoService).undoTodo(memberId, todoId);
+        doNothing().when(todoService).undoTodo(todoId, memberId);
         authenticate(memberId);
 
         mockMvc.perform(patch("/api/v1/todos/{todoId}/undo", todoId))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("Todo 삭제 요청은 204를 반환한다")
+    void deleteTodoReturnsNoContent() throws Exception {
+        Long memberId = 5L;
+        Long todoId = 7L;
+        doNothing().when(todoService).deleteTodo(todoId, memberId);
+        authenticate(memberId);
+
+        mockMvc.perform(delete("/api/v1/todos/{todoId}", todoId))
                 .andExpect(status().isNoContent());
     }
 

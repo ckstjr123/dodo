@@ -10,6 +10,7 @@ import com.dodo.todo.todo.service.TodoService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,7 +43,7 @@ public class TodoController implements TodoApiDocs {
     @Override
     @GetMapping("/{todoId}")
     public TodoResponse getTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
-        return todoService.getTodo(memberId, todoId);
+        return todoService.getTodo(todoId, memberId);
     }
 
     @Override
@@ -51,20 +52,27 @@ public class TodoController implements TodoApiDocs {
     public void updateTodo(@LoginMember Long memberId,
                            @PathVariable Long todoId,
                            @Valid @RequestBody TodoUpdateRequest request) {
-        todoService.updateTodo(memberId, todoId, request);
+        todoService.updateTodo(todoId, memberId, request);
     }
 
     @Override
     @PatchMapping("/{todoId}/complete")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void completeTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
-        todoService.completeTodo(memberId, todoId);
+        todoService.completeTodo(todoId, memberId);
     }
 
     @Override
     @PatchMapping("/{todoId}/undo")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void undoTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
-        todoService.undoTodo(memberId, todoId);
+        todoService.undoTodo(todoId, memberId);
+    }
+
+    @Override
+    @DeleteMapping("/{todoId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
+        todoService.deleteTodo(todoId, memberId);
     }
 }

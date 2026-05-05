@@ -35,7 +35,7 @@ public class TodoService {
     public Long saveTodo(Long memberId, TodoRequest request) {
         Member member = memberService.findById(memberId);
         Category category = findCategory(member, request.categoryId());
-        Todo mainTodo = findMainTodo(memberId, request.parentTodoId());
+        Todo mainTodo = findMainTodo(request.parentTodoId(), memberId);
         TodoRecurrence recurrence = request.getRecurrence();
 
         Todo todo = Todo.builder()
@@ -65,8 +65,8 @@ public class TodoService {
     }
 
     @Transactional(readOnly = true)
-    public TodoResponse getTodo(Long memberId, Long todoId) {
-        Todo todo = findTodoWithSubTodos(memberId, todoId);
+    public TodoResponse getTodo(Long todoId, Long memberId) {
+        Todo todo = findTodoWithSubTodos(todoId, memberId);
         return TodoResponse.from(todo);
     }
 
@@ -75,9 +75,9 @@ public class TodoService {
      * 상태와 완료 이력은 별도 완료/취소 기능에서만 변경한다.
      */
     @Transactional
-    public void updateTodo(Long memberId, Long todoId, TodoUpdateRequest request) {
+    public void updateTodo(Long todoId, Long memberId, TodoUpdateRequest request) {
         Member member = memberService.findById(memberId);
-        Todo todo = findTodo(memberId, todoId);
+        Todo todo = findTodo(todoId, memberId);
         Category category = findCategory(member, request.categoryId());
         TodoRecurrence recurrence = request.getRecurrence();
 
@@ -94,17 +94,29 @@ public class TodoService {
     }
 
     @Transactional
-    public void completeTodo(Long memberId, Long todoId) {
-        Todo todo = findTodoWithSubTodos(memberId, todoId);
+    public void completeTodo(Long todoId, Long memberId) {
+        Todo todo = findTodoWithSubTodos(todoId, memberId);
         LocalDateTime completedAt = LocalDateTime.now();
         todo.complete(completedAt);
         todoHistoryRepository.save(TodoHistory.create(todo, completedAt));
     }
 
     @Transactional
-    public void undoTodo(Long memberId, Long todoId) {
-        Todo todo = findTodoWithSubTodos(memberId, todoId);
+    public void undoTodo(Long todoId, Long memberId) {
+        Todo todo = findTodoWithSubTodos(todoId, memberId);
         todo.undo();
+    }
+
+    /**
+     * Todo를 삭제한다.
+     * 메인 Todo 삭제 시 하위 Todo를 먼저 삭제하여 부모 참조 제약을 지킨다.
+     */
+    @Transactional
+    public void deleteTodo(Long todoId, Long memberId) {
+        Todo todo = findTodo(todoId, memberId);
+
+        todoRepository.deleteSubTodosById(todo.getId());
+        todoRepository.deleteById(todo.getId());
     }
 
     private Category findCategory(Member member, Long categoryId) {
@@ -118,7 +130,7 @@ public class TodoService {
         return category;
     }
 
-    private Todo findMainTodo(Long memberId, Long mainTodoId) {
+    private Todo findMainTodo(Long mainTodoId, Long memberId) {
         if (mainTodoId == null) {
             return null;
         }
@@ -133,12 +145,12 @@ public class TodoService {
         return todo;
     }
 
-    private Todo findTodo(Long memberId, Long todoId) {
+    private Todo findTodo(Long todoId, Long memberId) {
         return todoRepository.findByIdAndMemberId(todoId, memberId)
                 .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
     }
 
-    private Todo findTodoWithSubTodos(Long memberId, Long todoId) {
+    private Todo findTodoWithSubTodos(Long todoId, Long memberId) {
         return todoRepository.findWithSubTodos(todoId, memberId)
                 .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
     }
