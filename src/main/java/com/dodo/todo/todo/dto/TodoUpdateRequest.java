@@ -32,11 +32,11 @@ public record TodoUpdateRequest(
         @Schema(description = "마감 일시. UTC Z suffix 없는 ISO-8601 LocalDateTime 형식", example = "2026-05-03T19:48:47", type = "string", format = "date-time", nullable = true)
         LocalDateTime dueAt,
 
-        @Schema(description = "예약 날짜. 오늘 또는 미래 날짜", example = "2026-05-03", type = "string", format = "date", nullable = true)
+        @Schema(description = "예정 날짜. 오늘 또는 미래 날짜", example = "2026-05-03", type = "string", format = "date", nullable = true)
         @FutureOrPresent
         LocalDate scheduledDate,
 
-        @Schema(description = "예약 시간. HH:mm:ss 형식", example = "19:48:00", type = "string", format = "time", nullable = true)
+        @Schema(description = "예정 시간. HH:mm:ss 형식", example = "19:48:00", type = "string", format = "time", nullable = true)
         LocalTime scheduledTime,
 
         @Schema(description = "반복 설정. 반복이 없으면 null", implementation = TodoRecurrenceRequest.class, nullable = true)

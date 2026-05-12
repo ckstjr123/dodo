@@ -13,10 +13,10 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
     @Query("""
             SELECT todo
             FROM Todo todo
-            WHERE todo.id = :parentTodoId
+            WHERE todo.id = :parentId
               and todo.member.id = :memberId
             """)
-    Optional<Todo> findByIdAndMemberId(@Param("parentTodoId") Long todoId, @Param("memberId") Long memberId);
+    Optional<Todo> findByIdAndMemberId(@Param("parentId") Long todoId, @Param("memberId") Long memberId);
 
     /**
      * Todo 목록과 바로 아래 하위 작업을 함께 조회한다.
@@ -48,15 +48,14 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
             WHERE todo.id = :todoId
               and todo.member.id = :memberId
             """)
-    Optional<Todo> findWithSubTodos(@Param("todoId") Long todoId,
-                                    @Param("memberId") Long memberId);
+    Optional<Todo> findWithSubTodos(@Param("todoId") Long todoId, @Param("memberId") Long memberId);
 
-    @Modifying(clearAutomatically = true)
+    @Modifying // clearAutomatically = true
     @Query("""
             DELETE FROM Todo todo
-            WHERE todo.mainTodo.id = :todoId
+            WHERE todo.mainTodo.id = :parentId
             """)
-    void deleteSubTodosById(@Param("todoId") Long todoId);
+    void deleteSubTodosByParentId(@Param("parentId") Long parentId);
 
     @Query("""
             SELECT COUNT(todo) > 0

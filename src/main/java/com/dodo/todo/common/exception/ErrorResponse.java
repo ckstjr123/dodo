@@ -7,7 +7,7 @@ public record ErrorResponse(
         @Schema(description = "에러 코드", example = "VALIDATION_ERROR")
         String code,
 
-        @Schema(description = "에러 메시지", example = "scheduledTime: HH:mm:ss 형식이어야 합니다.")
+        @Schema(description = "에러 메시지", example = "scheduledTime: HH:mm:ss 형식이어야 합니다")
         String message
 ) {
 

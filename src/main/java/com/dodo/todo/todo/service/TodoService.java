@@ -1,17 +1,19 @@
 package com.dodo.todo.todo.service;
 
 import com.dodo.todo.category.domain.Category;
-import com.dodo.todo.category.repository.CategoryRepository;
+import com.dodo.todo.category.service.CategoryService;
 import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
+import com.dodo.todo.reminder.service.ReminderService;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
-import com.dodo.todo.todo.dto.TodoRequest;
+import com.dodo.todo.todo.dto.TodoDetailResponse;
 import com.dodo.todo.todo.dto.TodoListResponse;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
@@ -27,14 +29,15 @@ import org.springframework.transaction.annotation.Transactional;
 public class TodoService {
 
     private final MemberService memberService;
-    private final CategoryRepository categoryRepository;
+    private final CategoryService categoryService;
     private final TodoRepository todoRepository;
     private final TodoHistoryRepository todoHistoryRepository;
+    private final ReminderService reminderService;
 
     @Transactional
     public Long saveTodo(Long memberId, TodoRequest request) {
         Member member = memberService.findById(memberId);
-        Category category = findCategory(member, request.categoryId());
+        Category category = categoryService.findByIdAndMemberId(request.categoryId(), memberId);
         Todo mainTodo = findMainTodo(request.parentTodoId(), memberId);
         TodoRecurrence recurrence = request.getRecurrence();
 
@@ -52,7 +55,10 @@ public class TodoService {
                 .recurrence(recurrence)
                 .build();
 
-        return todoRepository.save(todo).getId();
+        Todo savedTodo = todoRepository.save(todo);
+        reminderService.createReminders(savedTodo, member, request.reminders());
+
+        return savedTodo.getId();
     }
 
     @Transactional(readOnly = true)
@@ -65,20 +71,20 @@ public class TodoService {
     }
 
     @Transactional(readOnly = true)
-    public TodoResponse getTodo(Long todoId, Long memberId) {
+    public TodoDetailResponse getTodo(Long todoId, Long memberId) {
         Todo todo = findTodoWithSubTodos(todoId, memberId);
-        return TodoResponse.from(todo);
+        return TodoDetailResponse.from(todo);
     }
 
     /**
-     * Todo 기본 정보를 수정한다.
+     * Todo 기본 정보 수정
      * 상태와 완료 이력은 별도 완료/취소 기능에서만 변경한다.
      */
     @Transactional
     public void updateTodo(Long todoId, Long memberId, TodoUpdateRequest request) {
-        Member member = memberService.findById(memberId);
+        memberService.findById(memberId);
         Todo todo = findTodo(todoId, memberId);
-        Category category = findCategory(member, request.categoryId());
+        Category category = categoryService.findByIdAndMemberId(request.categoryId(), memberId);
         TodoRecurrence recurrence = request.getRecurrence();
 
         todo.updateDetails(
@@ -91,6 +97,10 @@ public class TodoService {
                 request.scheduledTime(),
                 recurrence
         );
+
+        if (request.scheduledDate() == null || request.scheduledTime() == null) {
+            reminderService.deleteRemindersByTodoId(todo.getId());
+        }
     }
 
     @Transactional
@@ -108,34 +118,28 @@ public class TodoService {
     }
 
     /**
-     * Todo를 삭제한다.
-     * 메인 Todo 삭제 시 하위 Todo를 먼저 삭제하여 부모 참조 제약을 지킨다.
+     * Todo 삭제
+     * 메인 Todo 삭제 시 하위 Todo를 먼저 삭제해 부모 참조 제약을 지킨다.
      */
     @Transactional
     public void deleteTodo(Long todoId, Long memberId) {
         Todo todo = findTodo(todoId, memberId);
 
-        todoRepository.deleteSubTodosById(todo.getId());
+        if (!todo.hasMainTodo()) {
+            reminderService.deleteRemindersByParentTodoId(todo.getId());
+            todoRepository.deleteSubTodosByParentId(todo.getId());
+        }
+
+        reminderService.deleteRemindersByTodoId(todo.getId());
         todoRepository.deleteById(todo.getId());
     }
 
-    private Category findCategory(Member member, Long categoryId) {
-        Category category = categoryRepository.findById(categoryId)
-                .orElseThrow(() -> new BusinessException(TodoError.CATEGORY_NOT_FOUND));
-
-        if (!category.isOwnedBy(member)) {
-            throw new BusinessException(TodoError.CATEGORY_NOT_FOUND);
-        }
-
-        return category;
-    }
-
-    private Todo findMainTodo(Long mainTodoId, Long memberId) {
-        if (mainTodoId == null) {
+    private Todo findMainTodo(Long todoId, Long memberId) {
+        if (todoId == null) {
             return null;
         }
 
-        Todo todo = todoRepository.findByIdAndMemberId(mainTodoId, memberId)
+        Todo todo = todoRepository.findByIdAndMemberId(todoId, memberId)
                 .orElseThrow(() -> new BusinessException(TodoError.TODO_NOT_FOUND));
 
         if (todo.hasMainTodo()) {

@@ -1,17 +1,18 @@
 package com.dodo.todo.todo.service;
 
 import com.dodo.todo.category.domain.Category;
-import com.dodo.todo.category.repository.CategoryRepository;
+import com.dodo.todo.category.service.CategoryService;
 import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
+import com.dodo.todo.recurrencerule.Frequency;
+import com.dodo.todo.recurrencerule.RecurrenceRule;
+import com.dodo.todo.recurrencerule.WeekDays;
+import com.dodo.todo.reminder.service.ReminderService;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoError;
 import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
-import com.dodo.todo.recurrencerule.Frequency;
-import com.dodo.todo.recurrencerule.RecurrenceRule;
-import com.dodo.todo.recurrencerule.WeekDays;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import com.dodo.todo.todo.dto.ByDayRequest;
@@ -21,6 +22,10 @@ import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,16 +33,17 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.Optional;
-
-import static com.dodo.todo.util.TestFixture.*;
+import static com.dodo.todo.util.TestFixture.createCategory;
+import static com.dodo.todo.util.TestFixture.createMember;
+import static com.dodo.todo.util.TestFixture.createRecurringTodo;
+import static com.dodo.todo.util.TestFixture.createScheduledTodo;
+import static com.dodo.todo.util.TestFixture.createSubTodo;
+import static com.dodo.todo.util.TestFixture.createTodo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -48,7 +54,7 @@ class TodoServiceTest {
     private MemberService memberService;
 
     @Mock
-    private CategoryRepository categoryRepository;
+    private CategoryService categoryService;
 
     @Mock
     private TodoRepository todoRepository;
@@ -56,19 +62,22 @@ class TodoServiceTest {
     @Mock
     private TodoHistoryRepository todoHistoryRepository;
 
+    @Mock
+    private ReminderService reminderService;
+
     @InjectMocks
     private TodoService todoService;
 
     @Test
-    @DisplayName("다른 회원 카테고리로 Todo를 생성할 수 없다")
-    void saveTodoRejectsForeignCategory() {
+    @DisplayName("조회할 수 없는 카테고리로 Todo를 생성할 수 없다")
+    void saveTodoRejectsUnavailableCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
         Member member = Member.of("member@example.com");
-        Category category = Category.create(Member.of("other@example.com"), "work");
 
         when(memberService.findById(memberId)).thenReturn(member);
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId))
+                .thenThrow(new BusinessException(TodoError.CATEGORY_NOT_FOUND));
 
         assertThatThrownBy(() -> todoService.saveTodo(
                 memberId,
@@ -89,7 +98,7 @@ class TodoServiceTest {
         Todo savedTodo = createTodo(savedTodoId, member, category, "title", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
         when(todoRepository.save(any(Todo.class))).thenReturn(savedTodo);
 
         Long todoId = todoService.saveTodo(
@@ -98,10 +107,11 @@ class TodoServiceTest {
         );
 
         assertThat(todoId).isEqualTo(savedTodoId);
+        verify(reminderService).createReminders(savedTodo, member, null);
     }
 
     @Test
-    @DisplayName("깊이가 2를 넘는 하위 작업은 생성할 수 없다")
+    @DisplayName("깊이가 2를 넘는 하위 Todo는 생성할 수 없다")
     void saveTodoRejectsDepthLimitExceeded() {
         Long memberId = 1L;
         Long categoryId = 10L;
@@ -112,7 +122,7 @@ class TodoServiceTest {
         Todo subTodo = createSubTodo(member, category, mainTodo, "sub", TodoStatus.TODO, mainTodoId);
 
         when(memberService.findById(memberId)).thenReturn(member);
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(category));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
         when(todoRepository.findByIdAndMemberId(mainTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
         assertThatThrownBy(() -> todoService.saveTodo(
@@ -171,7 +181,7 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("반복 종료일에 도달한 Todo를 완료하면 다음 일정이 없어 DONE 상태가 된다")
+    @DisplayName("반복 종료일에 도달한 Todo를 완료하면 DONE 상태가 된다")
     void completeRecurringTodoOnUntilDate() {
         Long memberId = 1L;
         Long todoId = 7L;
@@ -256,8 +266,10 @@ class TodoServiceTest {
 
         todoService.deleteTodo(todoId, memberId);
 
-        var inOrder = inOrder(todoRepository);
-        inOrder.verify(todoRepository).deleteSubTodosById(todoId);
+        var inOrder = inOrder(reminderService, todoRepository);
+        inOrder.verify(reminderService).deleteRemindersByParentTodoId(todoId);
+        inOrder.verify(todoRepository).deleteSubTodosByParentId(todoId);
+        inOrder.verify(reminderService).deleteRemindersByTodoId(todoId);
         inOrder.verify(todoRepository).deleteById(todoId);
     }
 
@@ -284,14 +296,14 @@ class TodoServiceTest {
         Category category = createCategory(member, "work");
         Category updatedCategory = createCategory(member, "private");
         Todo todo = createTodo(todoId, member, category, "before", TodoStatus.TODO);
-        TodoUpdateRequest request = createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), recurrence(
+        TodoUpdateRequest request = createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), createTodoRecurrenceRequest(
                 new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
                 RecurrenceCriteria.SCHEDULED_DATE
         ));
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(updatedCategory));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(updatedCategory);
 
         todoService.updateTodo(todoId, memberId, request);
 
@@ -300,6 +312,119 @@ class TodoServiceTest {
         assertThat(todo.getMemo()).isEqualTo("updated memo");
         assertThat(todo.getScheduledDate()).isEqualTo(LocalDate.of(2026, 4, 8));
         assertThat(todo.getRecurrence()).isEqualTo(request.getRecurrence());
+    }
+
+    @Test
+    @DisplayName("scheduledDate를 제거하면 시간과 반복을 제거하고 알림을 삭제한다")
+    void updateTodoClearsTimeRecurrenceAndRemindersWithoutScheduledDate() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Long categoryId = 10L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        TodoRecurrence recurrence = recurrence(
+                new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                RecurrenceCriteria.SCHEDULED_DATE
+        );
+        Todo todo = createScheduledTodo(
+                todoId,
+                member,
+                category,
+                "title",
+                LocalDate.of(2026, 4, 7),
+                LocalTime.of(14, 0)
+        );
+        todo.updateDetails(
+                category,
+                "title",
+                null,
+                null,
+                null,
+                LocalDate.of(2026, 4, 7),
+                LocalTime.of(14, 0),
+                recurrence
+        );
+        TodoUpdateRequest request = new TodoUpdateRequest(
+                categoryId,
+                "updated title",
+                "updated memo",
+                2,
+                LocalDateTime.of(2026, 4, 8, 18, 0),
+                null,
+                LocalTime.of(15, 0),
+                createTodoRecurrenceRequest(
+                        new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
+                        RecurrenceCriteria.SCHEDULED_DATE
+                )
+        );
+
+        when(memberService.findById(memberId)).thenReturn(member);
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
+
+        todoService.updateTodo(todoId, memberId, request);
+
+        assertThat(todo.getScheduledDate()).isNull();
+        assertThat(todo.getScheduledTime()).isNull();
+        assertThat(todo.getRecurrence()).isNull();
+        verify(reminderService).deleteRemindersByTodoId(todo.getId());
+    }
+
+    @Test
+    @DisplayName("scheduledTime을 제거하면 알림을 삭제한다")
+    void updateTodoDeletesRemindersWithoutScheduledTime() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Long categoryId = 10L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        Todo todo = createScheduledTodo(
+                todoId,
+                member,
+                category,
+                "title",
+                LocalDate.of(2026, 4, 7),
+                LocalTime.of(14, 0)
+        );
+        TodoUpdateRequest request = new TodoUpdateRequest(
+                categoryId,
+                "updated title",
+                "updated memo",
+                2,
+                LocalDateTime.of(2026, 4, 8, 18, 0),
+                LocalDate.of(2026, 4, 8),
+                null,
+                null
+        );
+
+        when(memberService.findById(memberId)).thenReturn(member);
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
+
+        todoService.updateTodo(todoId, memberId, request);
+
+        assertThat(todo.getScheduledTime()).isNull();
+        verify(reminderService).deleteRemindersByTodoId(todo.getId());
+    }
+
+    @Test
+    @DisplayName("Todo 완료 및 완료 취소 시 알림은 보존된다")
+    void completeAndUndoKeepReminders() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Member member = createMember(memberId);
+        Category category = createCategory(member, "work");
+        Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
+        Todo doneTodo = createTodo(todoId, member, category, "title", TodoStatus.DONE);
+
+        when(todoRepository.findWithSubTodos(todoId, memberId))
+                .thenReturn(Optional.of(todo))
+                .thenReturn(Optional.of(doneTodo));
+
+        todoService.completeTodo(todoId, memberId);
+        todoService.undoTodo(todoId, memberId);
+
+        verify(reminderService, never()).deleteRemindersByTodoId(todoId);
     }
 
     @Test
@@ -321,19 +446,19 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("다른 회원 카테고리로 Todo를 수정할 수 없다")
-    void updateTodoRejectsForeignCategory() {
+    @DisplayName("조회할 수 없는 카테고리로 Todo를 수정할 수 없다")
+    void updateTodoRejectsUnavailableCategory() {
         Long memberId = 1L;
         Long todoId = 7L;
         Long categoryId = 10L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Category foreignCategory = createCategory(Member.of("other@example.com"), "private");
         Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-        when(categoryRepository.findById(categoryId)).thenReturn(Optional.of(foreignCategory));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId))
+                .thenThrow(new BusinessException(TodoError.CATEGORY_NOT_FOUND));
 
         assertThatThrownBy(() -> todoService.updateTodo(
                 todoId,
@@ -348,7 +473,7 @@ class TodoServiceTest {
             Long categoryId,
             Long mainTodoId,
             LocalDate scheduledDate,
-            TodoRecurrence recurrence
+            TodoRecurrenceRequest recurrence
     ) {
         return new TodoRequest(
                 categoryId,
@@ -359,14 +484,14 @@ class TodoServiceTest {
                 LocalDateTime.of(2026, 4, 7, 18, 0),
                 scheduledDate,
                 LocalTime.of(14, 0),
-                createTodoRecurrenceRequest(recurrence)
+                recurrence
         );
     }
 
     private TodoUpdateRequest createTodoUpdateRequest(
             Long categoryId,
             LocalDate scheduledDate,
-            TodoRecurrence recurrence
+            TodoRecurrenceRequest recurrence
     ) {
         return new TodoUpdateRequest(
                 categoryId,
@@ -376,27 +501,22 @@ class TodoServiceTest {
                 LocalDateTime.of(2026, 4, 8, 18, 0),
                 scheduledDate,
                 LocalTime.of(15, 0),
-                createTodoRecurrenceRequest(recurrence)
+                recurrence
         );
     }
 
-    private TodoRecurrenceRequest createTodoRecurrenceRequest(TodoRecurrence recurrence) {
-        if (recurrence == null) {
-            return null;
-        }
-
-        RecurrenceRule rule = recurrence.rule();
+    private TodoRecurrenceRequest createTodoRecurrenceRequest(RecurrenceRule rule, RecurrenceCriteria criteria) {
         return new TodoRecurrenceRequest(
                 new RecurrenceRuleRequest(
                         rule.frequency(),
                         rule.interval(),
                         rule.byDay().isEmpty()
-                        ? null
-                        : new ByDayRequest(rule.byDay().offset(), rule.byDay().days()),
+                                ? null
+                                : new ByDayRequest(rule.byDay().offset(), rule.byDay().days()),
                         rule.byMonthDay(),
                         rule.until()
                 ),
-                recurrence.criteria()
+                criteria
         );
     }
 

@@ -54,7 +54,7 @@ public class CategoryService {
      */
     @Transactional
     public void updateCategory(Long memberId, Long categoryId, CategoryRequest request) {
-        Category category = findCategory(categoryId, memberId);
+        Category category = findByIdAndMemberId(categoryId, memberId);
         validateDuplicateName(category, memberId, request.name());
 
         category.updateName(request.name());
@@ -66,7 +66,7 @@ public class CategoryService {
      */
     @Transactional
     public void deleteCategory(Long memberId, Long categoryId) {
-        Category category = findCategory(categoryId, memberId);
+        Category category = findByIdAndMemberId(categoryId, memberId);
 
         if (todoRepository.existsByCategoryIdAndMemberId(categoryId, memberId)) {
             throw new BusinessException(CategoryError.CATEGORY_IN_USE);
@@ -82,7 +82,8 @@ public class CategoryService {
         return categoryRepository.save(category).getId();
     }
 
-    private Category findCategory(Long categoryId, Long memberId) {
+    @Transactional(readOnly = true)
+    public Category findByIdAndMemberId(Long categoryId, Long memberId) {
         return categoryRepository.findByIdAndMemberId(categoryId, memberId)
                 .orElseThrow(() -> new BusinessException(CategoryError.CATEGORY_NOT_FOUND));
     }

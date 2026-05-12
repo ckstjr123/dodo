@@ -7,6 +7,7 @@ import com.dodo.todo.recurrencerule.Day;
 import com.dodo.todo.recurrencerule.Frequency;
 import com.dodo.todo.recurrencerule.RecurrenceRule;
 import com.dodo.todo.recurrencerule.WeekDays;
+import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import org.junit.jupiter.api.DisplayName;
@@ -510,19 +511,55 @@ class TodoTest {
     }
 
     @Test
-    @DisplayName("수정할 반복 Todo에 scheduledDate가 없으면 예외가 발생한다")
-    void rejectUpdateRecurringTodoWithoutScheduledDate() {
+    @DisplayName("scheduledDate 제거 시 scheduledTime과 recurrence를 함께 제거한다")
+    void clearTimeAndRecurrenceWhenDateRemoved() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "work");
-        Todo todo = todo(member);
         TodoRecurrence recurrence = recurrence(
                 new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
                 RecurrenceCriteria.SCHEDULED_DATE
         );
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("recurring")
+                .status(TodoStatus.TODO)
+                .scheduledDate(LocalDate.of(2026, 6, 7))
+                .scheduledTime(LocalTime.of(14, 0))
+                .recurrence(recurrence)
+                .build();
 
-        assertThatThrownBy(() -> todo.updateDetails(category, "title", null, null, null, null, null, recurrence))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED.message());
+        todo.updateDetails(category, "title", null, null, null, null, LocalTime.of(15, 0), recurrence);
+
+        assertAll(
+                () -> assertThat(todo.getScheduledDate()).isNull(),
+                () -> assertThat(todo.getScheduledTime()).isNull(),
+                () -> assertThat(todo.getRecurrence()).isNull()
+        );
+    }
+
+    @Test
+    @DisplayName("일정이 변경되면 기존 알림의 remindAt을 재계산한다")
+    void updateDetailsReschedulesRemindersWhenScheduleChanged() {
+        Member member = Member.of("member@example.com");
+        Category category = Category.create(member, "work");
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("todo")
+                .status(TodoStatus.TODO)
+                .scheduledDate(LocalDate.of(2026, 6, 7))
+                .scheduledTime(LocalTime.of(14, 0))
+                .build();
+        int minuteOffset = 30;
+        Reminder reminder = Reminder.create(todo, member, minuteOffset);
+        setReminders(todo, reminder);
+        LocalDate changedDate = LocalDate.of(2026, 6, 8);
+        LocalTime changedTime = LocalTime.of(15, 0);
+
+        todo.updateDetails(category, "title", null, null, null, changedDate, changedTime, null);
+
+        assertThat(reminder.getRemindAt()).isEqualTo(LocalDateTime.of(changedDate, changedTime).minusMinutes(minuteOffset));
     }
 
     private Todo todo(Member member) {
@@ -538,6 +575,10 @@ class TodoTest {
 
     private void setSubTodos(Todo mainTodo, Todo... subTodos) {
         ReflectionTestUtils.setField(mainTodo, "subTodos", List.of(subTodos));
+    }
+
+    private void setReminders(Todo todo, Reminder... reminders) {
+        ReflectionTestUtils.setField(todo, "reminders", List.of(reminders));
     }
 
     private TodoRecurrence recurrence(RecurrenceRule rule, RecurrenceCriteria criteria) {
