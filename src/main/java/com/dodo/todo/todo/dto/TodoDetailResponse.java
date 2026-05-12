@@ -1,5 +1,6 @@
 package com.dodo.todo.todo.dto;
 
+import com.dodo.todo.reminder.dto.ReminderResponse;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -9,8 +10,8 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
-@Schema(description = "Todo 목록 항목 응답. 목록 조회에서는 알림 상세를 포함하지 않음")
-public record TodoResponse(
+@Schema(description = "Todo 상세 응답. 현재 Todo의 알림 상세를 포함")
+public record TodoDetailResponse(
         @Schema(description = "Todo ID", example = "1")
         Long todoId,
 
@@ -26,7 +27,7 @@ public record TodoResponse(
         @Schema(description = "Todo 제목", example = "운동하기")
         String title,
 
-        @Schema(description = "메모", example = "퇴근 후 헬스장 가기", nullable = true)
+        @Schema(description = "메모", nullable = true)
         String memo,
 
         @Schema(description = "Todo 상태", example = "TODO", allowableValues = {"TODO", "DONE"})
@@ -35,24 +36,27 @@ public record TodoResponse(
         @Schema(description = "정렬 순서", example = "0")
         int sortOrder,
 
-        @Schema(description = "마감 일시", example = "2026-05-03T19:48:47", type = "string", format = "date-time", nullable = true)
+        @Schema(description = "마감 일시", type = "string", format = "date-time", nullable = true)
         LocalDateTime dueAt,
 
-        @Schema(description = "예정 날짜", example = "2026-05-03", type = "string", format = "date", nullable = true)
+        @Schema(description = "예정 날짜", type = "string", format = "date", nullable = true)
         LocalDate scheduledDate,
 
-        @Schema(description = "예정 시간", example = "19:48:00", type = "string", format = "time", nullable = true)
+        @Schema(description = "예정 시간", type = "string", format = "time", nullable = true)
         LocalTime scheduledTime,
 
         @Schema(description = "반복 설정", nullable = true)
         TodoRecurrenceResponse recurrence,
 
-        @ArraySchema(schema = @Schema(description = "하위 Todo 목록 항목. 목록 조회에서는 하위 Todo의 알림 상세를 포함하지 않음"))
+        @ArraySchema(schema = @Schema(description = "현재 Todo에 설정된 미리 알림"))
+        List<ReminderResponse> reminders,
+
+        @ArraySchema(schema = @Schema(description = "하위 Todo 목록 항목. 하위 Todo 알림 상세는 포함하지 않음"))
         List<TodoResponse> subTodos
 ) {
 
-    public static TodoResponse from(Todo todo) {
-        return new TodoResponse(
+    public static TodoDetailResponse from(Todo todo) {
+        return new TodoDetailResponse(
                 todo.getId(),
                 todo.getMainTodoId(),
                 todo.getCategoryId(),
@@ -65,6 +69,9 @@ public record TodoResponse(
                 todo.getScheduledDate(),
                 todo.getScheduledTime(),
                 TodoRecurrenceResponse.from(todo.getRecurrence()),
+                todo.getReminders().stream()
+                        .map(ReminderResponse::from)
+                        .toList(),
                 todo.getSubTodos().stream()
                         .map(TodoResponse::from)
                         .toList()

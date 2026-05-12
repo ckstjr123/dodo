@@ -2,9 +2,9 @@ package com.dodo.todo.todo.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
 import com.dodo.todo.todo.dto.TodoCreateResponse;
+import com.dodo.todo.todo.dto.TodoDetailResponse;
 import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoListResponse;
-import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.service.TodoService;
 import jakarta.validation.Valid;
@@ -42,7 +42,7 @@ public class TodoController implements TodoApiDocs {
 
     @Override
     @GetMapping("/{todoId}")
-    public TodoResponse getTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
+    public TodoDetailResponse getTodo(@LoginMember Long memberId, @PathVariable Long todoId) {
         return todoService.getTodo(todoId, memberId);
     }
 

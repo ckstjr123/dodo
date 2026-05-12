@@ -2,11 +2,13 @@ package com.dodo.todo.util;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
+import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -40,6 +42,26 @@ public final class TestFixture {
 
     public static Todo createTodo(Long id, Member member, Category category, String title, TodoStatus status) {
         Todo todo = createTodo(member, category, null, title, status, null);
+        setId(todo, id);
+        return todo;
+    }
+
+    public static Todo createScheduledTodo(
+            Long id,
+            Member member,
+            Category category,
+            String title,
+            LocalDate scheduledDate,
+            LocalTime scheduledTime
+    ) {
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title(title)
+                .status(TodoStatus.TODO)
+                .scheduledDate(scheduledDate)
+                .scheduledTime(scheduledTime)
+                .build();
         setId(todo, id);
         return todo;
     }
@@ -78,6 +100,12 @@ public final class TestFixture {
         Todo todo = createTodo(member, category, mainTodo, title, status, null);
         setId(todo, id);
         return todo;
+    }
+
+    public static Reminder createReminder(Long id, Todo todo, Member member, int minuteOffset) {
+        Reminder reminder = Reminder.create(todo, member, minuteOffset);
+        setId(reminder, id);
+        return reminder;
     }
 
     private static Todo createTodo(

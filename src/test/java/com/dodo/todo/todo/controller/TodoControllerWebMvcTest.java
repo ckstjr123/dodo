@@ -1,34 +1,23 @@
 package com.dodo.todo.todo.controller;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
 import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
-import com.dodo.todo.todo.domain.TodoError;
-import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.recurrencerule.Day;
 import com.dodo.todo.recurrencerule.Frequency;
+import com.dodo.todo.todo.domain.TodoError;
+import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.dto.ByDayRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
 import com.dodo.todo.todo.dto.RecurrenceRuleResponse;
-import com.dodo.todo.todo.dto.TodoRequest;
+import com.dodo.todo.todo.dto.TodoDetailResponse;
 import com.dodo.todo.todo.dto.TodoListResponse;
 import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
 import com.dodo.todo.todo.dto.TodoRecurrenceResponse;
+import com.dodo.todo.todo.dto.TodoRequest;
 import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.service.TodoService;
@@ -49,6 +38,18 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(TodoController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -74,7 +75,7 @@ class TodoControllerWebMvcTest {
     void createTodoReturnsCreatedResponse() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        TodoRequest request = createTodoRequest(LocalDate.of(2026, 5, 7));
+        TodoRequest request = createTodoRequest(LocalDate.of(2026, 6, 7));
         when(todoService.saveTodo(eq(memberId), any(TodoRequest.class))).thenReturn(todoId);
         authenticate(memberId);
 
@@ -86,7 +87,7 @@ class TodoControllerWebMvcTest {
     }
 
     @Test
-    @DisplayName("Todo 생성 요청 검증 실패 시 오류를 반환한다")
+    @DisplayName("Todo 생성 요청 검증 실패 시 에러를 반환한다")
     void createTodoReturnsValidationError() throws Exception {
         Long memberId = 5L;
         TodoRequest request = new TodoRequest(
@@ -130,13 +131,14 @@ class TodoControllerWebMvcTest {
     void getTodoReturnsTodo() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        when(todoService.getTodo(todoId, memberId)).thenReturn(response(todoId, "보고서 작성"));
+        when(todoService.getTodo(todoId, memberId)).thenReturn(detailResponse(todoId, "보고서 작성"));
         authenticate(memberId);
 
         mockMvc.perform(get("/api/v1/todos/{todoId}", todoId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.todoId").value(todoId))
                 .andExpect(jsonPath("$.title").value("보고서 작성"))
+                .andExpect(jsonPath("$.reminders").isArray())
                 .andExpect(jsonPath("$.subTodos[0].title").value("초안 작성"));
     }
 
@@ -145,7 +147,7 @@ class TodoControllerWebMvcTest {
     void updateTodoReturnsNoContent() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.of(2026, 5, 7));
+        TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.of(2026, 6, 7));
         doNothing().when(todoService).updateTodo(eq(todoId), eq(memberId), any(TodoUpdateRequest.class));
         authenticate(memberId);
 
@@ -232,7 +234,7 @@ class TodoControllerWebMvcTest {
                 "보고서 작성",
                 "초안부터 작성",
                 1,
-                LocalDateTime.of(2026, 4, 7, 18, 0),
+                LocalDateTime.of(2026, 6, 7, 18, 0),
                 scheduledDate,
                 LocalTime.of(14, 0),
                 createTodoRecurrenceRequest()
@@ -245,7 +247,7 @@ class TodoControllerWebMvcTest {
                 "보고서 작성",
                 "초안부터 작성",
                 1,
-                LocalDateTime.of(2026, 4, 7, 18, 0),
+                LocalDateTime.of(2026, 6, 7, 18, 0),
                 scheduledDate,
                 LocalTime.of(14, 0),
                 createTodoRecurrenceRequest()
@@ -262,6 +264,26 @@ class TodoControllerWebMvcTest {
                         null
                 ),
                 RecurrenceCriteria.SCHEDULED_DATE
+        );
+    }
+
+    private TodoDetailResponse detailResponse(Long todoId, String title) {
+        TodoResponse response = response(todoId, title);
+        return new TodoDetailResponse(
+                response.todoId(),
+                response.parentTodoId(),
+                response.categoryId(),
+                response.categoryName(),
+                response.title(),
+                response.memo(),
+                response.status(),
+                response.sortOrder(),
+                response.dueAt(),
+                response.scheduledDate(),
+                response.scheduledTime(),
+                response.recurrence(),
+                List.of(),
+                response.subTodos()
         );
     }
 

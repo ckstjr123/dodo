@@ -1,19 +1,18 @@
 DROP TABLE todo_tag;
 DROP TABLE tag;
 DROP TABLE todo_repeat;
-DROP TABLE reminder;
 DROP TABLE checklist;
 
 ALTER TABLE todo
     DROP COLUMN priority,
-    ADD COLUMN parent_todo_id BIGINT NULL,
+    ADD COLUMN parent_id BIGINT NULL,
     ADD COLUMN scheduled_date DATE NULL,
     ADD COLUMN scheduled_time TIME NULL,
     ADD COLUMN recurrence JSON NULL;
 
 ALTER TABLE todo
     ADD CONSTRAINT fk_todo_parent
-        FOREIGN KEY (parent_todo_id) REFERENCES todo (id);
+        FOREIGN KEY (parent_id) REFERENCES todo (id);
 
 CREATE TABLE todo_history (
     id BIGINT NOT NULL AUTO_INCREMENT,
