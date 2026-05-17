@@ -1,6 +1,6 @@
 package com.dodo.todo.todo.dto;
 
-import com.dodo.todo.reminder.dto.ReminderRequest;
+import com.dodo.todo.reminder.dto.ReminderCreateRequest;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
@@ -50,7 +50,7 @@ public record TodoRequest(
 
         @Schema(description = "초기 미리 알림 목록. 생성 후 알림 관리는 Reminder API를 사용", nullable = true)
         @Valid
-        List<ReminderRequest> reminders
+        List<ReminderCreateRequest> reminders
 ) {
 
     public TodoRequest(

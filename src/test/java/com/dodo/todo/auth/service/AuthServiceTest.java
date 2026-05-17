@@ -84,11 +84,10 @@ class AuthServiceTest {
                 "google-access-token"
         );
         OAuthUserInfo userInfo = new OAuthUserInfo(SocialProvider.GOOGLE, "google-123", email, true);
-        Member savedMember = createMember(memberId, email);
 
         when(oAuthClients.authenticate(SocialProvider.GOOGLE, request.accessToken()))
                 .thenReturn(userInfo);
-        when(memberRepository.save(any())).thenReturn(savedMember);
+        when(memberRepository.save(any())).thenReturn(createMember(memberId, email));
 
         TokenResponse response = authService.login(request);
 

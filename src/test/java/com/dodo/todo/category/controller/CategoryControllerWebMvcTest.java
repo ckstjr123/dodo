@@ -63,7 +63,7 @@ class CategoryControllerWebMvcTest {
         Long categoryId = 10L;
         CategoryRequest request = new CategoryRequest("업무");
 
-        when(categoryService.createCategory(eq(memberId), any(CategoryRequest.class))).thenReturn(categoryId);
+        when(categoryService.saveCategory(eq(memberId), any(CategoryRequest.class))).thenReturn(categoryId);
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/categories")

@@ -2,7 +2,8 @@ package com.dodo.todo.util;
 
 import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.reminder.domain.Reminder;
+import com.dodo.todo.reminder.domain.AbsoluteReminder;
+import com.dodo.todo.reminder.domain.RelativeReminder;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
@@ -36,8 +37,8 @@ public final class TestFixture {
         return category;
     }
 
-    public static Todo createTodo(Member member, Category category, String title) {
-        return createTodo(member, category, null, title, TodoStatus.TODO, null);
+    public static Todo createTodo(Member member, Category category, String title, TodoStatus status) {
+        return createTodo(member, category, null, title, status, null);
     }
 
     public static Todo createTodo(Long id, Member member, Category category, String title, TodoStatus status) {
@@ -47,6 +48,27 @@ public final class TestFixture {
     }
 
     public static Todo createScheduledTodo(
+            Long id,
+            Member member,
+            String categoryName,
+            String title,
+            LocalDate scheduledDate,
+            LocalTime scheduledTime
+    ) {
+        return createScheduledTodo(id, member, createCategory(member, categoryName), title, scheduledDate, scheduledTime);
+    }
+
+    public static Todo createScheduledTodo(
+            Member member,
+            String categoryName,
+            String title,
+            LocalDate scheduledDate,
+            LocalTime scheduledTime
+    ) {
+        return createScheduledTodo(null, member, createCategory(member, categoryName), title, scheduledDate, scheduledTime);
+    }
+
+    private static Todo createScheduledTodo(
             Long id,
             Member member,
             Category category,
@@ -62,7 +84,9 @@ public final class TestFixture {
                 .scheduledDate(scheduledDate)
                 .scheduledTime(scheduledTime)
                 .build();
-        setId(todo, id);
+        if (id != null) {
+            setId(todo, id);
+        }
         return todo;
     }
 
@@ -85,8 +109,21 @@ public final class TestFixture {
                 .recurrence(recurrence)
                 .dueAt(null)
                 .build();
-        setId(todo, id);
+        if (id != null) {
+            setId(todo, id);
+        }
         return todo;
+    }
+
+    public static Todo createRecurringTodo(
+            Member member,
+            Category category,
+            String title,
+            TodoStatus status,
+            LocalDate scheduledDate,
+            TodoRecurrence recurrence
+    ) {
+        return createRecurringTodo(null, member, category, title, status, scheduledDate, recurrence);
     }
 
     public static Todo createSubTodo(
@@ -94,16 +131,19 @@ public final class TestFixture {
             Category category,
             Todo mainTodo,
             String title,
-            TodoStatus status,
-            Long id
+            TodoStatus status
     ) {
-        Todo todo = createTodo(member, category, mainTodo, title, status, null);
-        setId(todo, id);
-        return todo;
+        return createTodo(member, category, mainTodo, title, status, null);
     }
 
-    public static Reminder createReminder(Long id, Todo todo, Member member, int minuteOffset) {
-        Reminder reminder = Reminder.create(todo, member, minuteOffset);
+    public static RelativeReminder createRelativeReminder(Long id, Todo todo, Member member, int minuteOffset) {
+        RelativeReminder reminder = RelativeReminder.create(todo, member, minuteOffset);
+        setId(reminder, id);
+        return reminder;
+    }
+
+    public static AbsoluteReminder createAbsoluteReminder(Long id, Todo todo, Member member, LocalDateTime due) {
+        AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, due);
         setId(reminder, id);
         return reminder;
     }

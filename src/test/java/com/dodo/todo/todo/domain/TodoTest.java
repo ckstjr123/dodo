@@ -8,6 +8,7 @@ import com.dodo.todo.recurrencerule.Frequency;
 import com.dodo.todo.recurrencerule.RecurrenceRule;
 import com.dodo.todo.recurrencerule.WeekDays;
 import com.dodo.todo.reminder.domain.Reminder;
+import com.dodo.todo.reminder.domain.RelativeReminder;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
 import org.junit.jupiter.api.DisplayName;
@@ -539,8 +540,8 @@ class TodoTest {
     }
 
     @Test
-    @DisplayName("일정이 변경되면 기존 알림의 remindAt을 재계산한다")
-    void updateDetailsReschedulesRemindersWhenScheduleChanged() {
+    @DisplayName("일정이 변경되어도 기존 알림 설정은 변경하지 않는다")
+    void updateDetailsDoesNotChangeReminderSettingsWhenScheduleChanged() {
         Member member = Member.of("member@example.com");
         Category category = Category.create(member, "work");
         Todo todo = Todo.builder()
@@ -552,14 +553,14 @@ class TodoTest {
                 .scheduledTime(LocalTime.of(14, 0))
                 .build();
         int minuteOffset = 30;
-        Reminder reminder = Reminder.create(todo, member, minuteOffset);
+        RelativeReminder reminder = RelativeReminder.create(todo, member, minuteOffset);
         setReminders(todo, reminder);
         LocalDate changedDate = LocalDate.of(2026, 6, 8);
         LocalTime changedTime = LocalTime.of(15, 0);
 
         todo.updateDetails(category, "title", null, null, null, changedDate, changedTime, null);
 
-        assertThat(reminder.getRemindAt()).isEqualTo(LocalDateTime.of(changedDate, changedTime).minusMinutes(minuteOffset));
+        assertThat(reminder.getMinuteOffset()).isEqualTo(minuteOffset);
     }
 
     private Todo todo(Member member) {

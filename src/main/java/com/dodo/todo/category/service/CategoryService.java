@@ -28,7 +28,7 @@ public class CategoryService {
      * 같은 회원에게 동일한 이름의 카테고리가 있으면 기존 카테고리 ID를 반환함.
      */
     @Transactional
-    public Long createCategory(Long memberId, CategoryRequest request) {
+    public Long saveCategory(Long memberId, CategoryRequest request) {
         return categoryRepository.findByMemberIdAndName(memberId, request.name())
                 .map(Category::getId)
                 .orElseGet(() -> saveCategory(memberId, request.name()));

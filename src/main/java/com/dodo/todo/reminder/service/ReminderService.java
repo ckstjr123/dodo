@@ -5,8 +5,9 @@ import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.reminder.domain.ReminderError;
-import com.dodo.todo.reminder.dto.ReminderRequest;
-import com.dodo.todo.reminder.dto.ReminderResponse;
+import com.dodo.todo.reminder.domain.ReminderFactory;
+import com.dodo.todo.reminder.dto.ReminderCreateRequest;
+import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoError;
@@ -28,60 +29,47 @@ public class ReminderService {
 
     /**
      * 알림 생성
-     * Todo에 날짜와 시간이 있을 때만 단건 알림을 추가한다.
+     * 알림 타입별 설정값을 검증한 뒤 Todo에 알림을 추가한다.
      */
     @Transactional
-    public ReminderResponse createReminder(Long memberId, Long todoId, ReminderRequest request) {
+    public Long saveReminder(Long memberId, Long todoId, ReminderCreateRequest request) {
         Member member = memberService.findById(memberId);
         Todo todo = findTodo(todoId, memberId);
-        List<ReminderRequest> requests = List.of(request);
+        validateReminderLimit(todo.getId(), 1);
 
-        validateSchedule(todo);
-        validateReminderLimit(todo.getId(), requests.size());
-        validateDuplicateMinuteOffset(todo.getId(), request.minuteOffset());
+        Reminder reminder = reminderRepository.save(ReminderFactory.create(todo, member, request));
 
-        Reminder reminder = reminderRepository.save(Reminder.create(todo, member, request.minuteOffset()));
-
-        return ReminderResponse.from(reminder);
+        return reminder.getId();
     }
 
     /**
      * 알림 목록 생성
-     * Todo 생성 시 전달된 초기 알림을 저장한다.
+     * Todo 생성 시 전달된 초기 알림 설정들을 저장한다.
      */
     @Transactional
-    public void createReminders(Todo todo, Member member, List<ReminderRequest> requests) {
+    public List<Long> saveReminders(Todo todo, Member member, List<ReminderCreateRequest> requests) {
         if (requests == null || requests.isEmpty()) {
-            return;
+            return List.of();
         }
-
-        validateSchedule(todo);
         validateReminderLimit(todo.getId(), requests.size());
-        validateDistinctMinuteOffsets(requests.stream()
-                .map(ReminderRequest::minuteOffset)
-                .toList());
 
         List<Reminder> reminders = requests.stream()
-                .map(request -> Reminder.create(todo, member, request.minuteOffset()))
+                .map(request -> ReminderFactory.create(todo, member, request))
                 .toList();
-        reminderRepository.saveAll(reminders);
+        return reminderRepository.saveAll(reminders).stream()
+                .map(Reminder::getId)
+                .toList();
     }
 
     /**
      * 알림 수정
-     * 기존 알림 row를 유지하고 offset과 알림 시각을 갱신한다.
+     * 기존 알림 row를 유지하고 타입별 설정값만 변경한다.
      */
     @Transactional
-    public ReminderResponse updateReminder(Long memberId, Long todoId, Long reminderId, ReminderRequest request) {
+    public void updateReminder(Long memberId, Long todoId, Long reminderId, ReminderUpdateRequest request) {
         Reminder reminder = findReminder(memberId, todoId, reminderId);
-        validateSchedule(reminder.getTodo());
-        if (reminder.getMinuteOffset() != request.minuteOffset()) {
-            validateDuplicateMinuteOffset(todoId, request.minuteOffset());
-        }
 
-        reminder.updateMinuteOffset(request.minuteOffset());
-
-        return ReminderResponse.from(reminder);
+        reminder.update(request);
     }
 
     /**
@@ -113,32 +101,10 @@ public class ReminderService {
         reminderRepository.deleteByParentTodoId(parentTodoId);
     }
 
-    private void validateDistinctMinuteOffsets(List<Integer> minuteOffsets) {
-        long distinctCount = minuteOffsets.stream()
-                .distinct()
-                .count();
-
-        if (distinctCount != minuteOffsets.size()) {
-            throw new BusinessException(ReminderError.REMINDER_OFFSET_DUPLICATED);
-        }
-    }
-
     private void validateReminderLimit(Long todoId, int newReminderCount) {
         int savedReminderCount = reminderRepository.countByTodoId(todoId);
         if (savedReminderCount + newReminderCount > MAX_REMINDER_COUNT) {
             throw new BusinessException(ReminderError.REMINDER_LIMIT_EXCEEDED);
-        }
-    }
-
-    private void validateSchedule(Todo todo) {
-        if (todo.getScheduledDate() == null || todo.getScheduledTime() == null) {
-            throw new BusinessException(ReminderError.REMINDER_SCHEDULE_REQUIRED);
-        }
-    }
-
-    private void validateDuplicateMinuteOffset(Long todoId, int minuteOffset) {
-        if (reminderRepository.existsByTodoIdAndMinuteOffset(todoId, minuteOffset)) {
-            throw new BusinessException(ReminderError.REMINDER_OFFSET_DUPLICATED);
         }
     }
 

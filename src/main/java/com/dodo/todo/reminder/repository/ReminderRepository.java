@@ -11,8 +11,6 @@ public interface ReminderRepository extends JpaRepository<Reminder, Long> {
 
     int countByTodoId(Long todoId);
 
-    boolean existsByTodoIdAndMinuteOffset(Long todoId, int minuteOffset);
-
     @Query("""
             SELECT reminder
             FROM Reminder reminder

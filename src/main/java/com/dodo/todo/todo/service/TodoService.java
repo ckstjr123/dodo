@@ -56,7 +56,7 @@ public class TodoService {
                 .build();
 
         Todo savedTodo = todoRepository.save(todo);
-        reminderService.createReminders(savedTodo, member, request.reminders());
+        reminderService.saveReminders(savedTodo, member, request.reminders());
 
         return savedTodo.getId();
     }

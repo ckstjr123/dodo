@@ -146,4 +146,31 @@ class RecurrenceRuleTest {
         assertThat(rule.byMonthDay()).isEqualTo(15);
     }
 
+
+    @Test
+    void test() {
+        In in = new In(null);
+
+    }
+
+    void dd(In ss) {
+        idd(ss.get());
+    }
+
+    void idd(int sss) {
+
+    }
+    static class In {
+        private Integer a = 5;
+
+        public In(Integer o) {
+            this.a = o;
+        }
+
+        Integer get() {
+            return a;
+        }
+
+    }
+
 }

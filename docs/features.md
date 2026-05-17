@@ -56,7 +56,7 @@
 - `recurrence=null`이면 반복 설정을 제거한다.
 - `scheduledDate`를 제거하면 `scheduledTime`, `recurrence`, 연결된 알림을 함께 무효화한다.
 - `scheduledTime`을 제거하면 연결된 알림을 무효화한다.
-- `scheduledDate` 또는 `scheduledTime`이 변경되고 둘 다 존재하면 기존 알림의 `minuteOffset`을 유지한 채 `remindAt`을 재계산한다.
+- `scheduledDate` 또는 `scheduledTime`이 변경되고 둘 다 존재하면 기존 `RELATIVE` 알림은 변경된 Todo 일정 기준으로 계산된다.
 
 ## Todo Delete
 
@@ -137,10 +137,10 @@
 - 완료/undo 시 알림 설정은 삭제하지 않는다.
 - 완료 상태 Todo의 알림은 향후 발송 후보에서 제외한다.
 - undo하면 기존 알림 설정은 그대로 유지된다.
-- Todo 알림은 별도 발송 이력 테이블을 두지 않고 `reminder` 테이블 하나로 관리한다.
-- 실제 발송 기능을 추가할 때도 `reminder`는 사용자의 알림 설정과 현재 회차 발송 상태를 함께 보유한다.
-- 반복 Todo가 다음 회차로 이동하거나 일정이 변경되면 기존 `reminder` row를 유지하고 `remindAt`을 재계산한다.
-- 향후 발송 상태가 필요해지면 `sentAt` 같은 현재 회차 발송 상태 컬럼을 `reminder`에 추가하고, 다음 회차 재계산 시 초기화한다.
+- Todo 알림 설정은 `reminder` 테이블 하나로 관리한다.
+- `reminder`는 싱글 테이블 상속 구조를 사용하며, 구현체가 알림 예정 시각을 계산한다.
+- 반복 Todo가 다음 회차로 이동하거나 일정이 변경되면 기존 `RELATIVE` 알림은 변경된 Todo 일정 기준으로 다시 계산된다.
+- 실제 발송 기능과 발송 상태 저장 방식은 후속 설계 범위다.
 
 ## SubTodos
 
@@ -175,31 +175,28 @@
 - 전체 삭제 API는 제공하지 않는다.
 - Todo 생성 시 초기 알림은 `reminders` 배열로 함께 생성할 수 있다.
 - Todo 수정 API에서는 알림 배열을 받지 않고, 알림 생성/수정/삭제는 Reminder API에서 관리한다.
-- 알림은 `scheduledDate`와 `scheduledTime`이 모두 있는 Todo에만 설정할 수 있다.
-- 알림 요청이 있는데 `scheduledDate` 또는 `scheduledTime` 중 하나라도 없으면 400 응답을 반환한다.
-- Todo 하나당 알림은 최대 5개까지 허용한다.
-- `minuteOffset`은 일정 시각 기준 몇 분 전 알림인지 나타내는 0 이상의 정수다.
-- `minuteOffset`은 요청에서 반드시 전달해야 하며 `null`은 허용하지 않는다.
-- 동일 Todo 안에서 같은 `minuteOffset`을 가진 알림은 중복 등록할 수 없다.
-- 서버는 UI 옵션명이나 라벨을 저장하지 않고 `minuteOffset`과 계산된 `remindAt`만 저장한다.
-- 저장 시 `remindAt = scheduledDate + scheduledTime - minuteOffset`으로 계산한다.
-- 계산된 `remindAt`이 현재보다 과거여도 예외를 던지지 않고 저장한다.
-- 응답에는 `reminderId`, `minuteOffset`, `remindAt`을 포함한다.
+- Todo 하나의 알림은 최대 5개까지 허용한다.
+- 알림은 JPA 싱글 테이블 상속 매핑을 사용하며 `reminder_type`으로 구현체를 구분한다.
+- 알림 타입은 `RELATIVE`, `ABSOLUTE`를 사용한다.
+- `RELATIVE` 알림은 Todo의 `scheduledDate`, `scheduledTime` 기준으로 `minuteOffset`분 전에 울린다.
+- `RELATIVE` 알림을 생성하거나 계산할 때 Todo에 `scheduledDate`, `scheduledTime`이 모두 있어야 한다.
+- `RELATIVE` 알림의 `minuteOffset`은 0 이상 정수여야 한다.
+- `RELATIVE` 요청에서 `minuteOffset`이 `null`이면 요청 DTO가 음수 sentinel 값을 반환하고, 엔티티 검증에서 실패한다.
+- `ABSOLUTE` 알림은 Todo 일정과 별개로 요청의 `due` 시각에 울린다.
+- `ABSOLUTE` 알림의 `due`는 필수 값이다.
+- 요청의 `type`이 없으면 기본 타입은 `RELATIVE`로 처리한다.
+- 생성 시 `type`에 맞는 필드만 사용하며, 다른 타입의 필드는 저장 로직에 반영하지 않는다.
+- 수정 시 기존 알림 구현체의 타입은 변경하지 않고, 해당 구현체에 필요한 필드만 반영한다.
+- 서버는 `remindAt`을 컬럼으로 저장하지 않고, 구현체의 `calculateRemindAt()`으로 계산한다.
+- `RELATIVE` 알림의 계산 값은 `scheduledDate + scheduledTime - minuteOffset`이다.
+- `ABSOLUTE` 알림의 계산 값은 `due`이다.
+- 응답에는 `reminderId`, `type`, `minuteOffset`, `due`를 포함한다.
 - 응답에는 `expired` 필드를 두지 않는다.
-- 알림 수정은 기존 reminder row를 유지하고 `minuteOffset`과 `remindAt`을 갱신한다.
-- 알림 수정 시 `minuteOffset`이 변경된 경우에만 동일 Todo 내 중복 여부를 검증한다.
-- Todo 일정이 변경되고 `scheduledDate`, `scheduledTime`이 모두 존재하면 기존 알림의 `minuteOffset`을 유지한 채 `remindAt`을 재계산한다.
-- `scheduledDate`가 제거되면 `scheduledTime`, `recurrence`, 연결된 알림을 함께 무효화한다.
-- `scheduledTime`이 제거되면 연결된 알림을 무효화한다.
+- Todo 일정에서 `scheduledDate` 또는 `scheduledTime`이 제거되면 연결된 알림은 함께 무효화되어 삭제된다.
 - Todo 완료/undo 시 알림 설정은 삭제하지 않는다.
-- 반복 Todo 완료 후 다음 회차가 있으면 이동된 `scheduledDate`와 기존 `scheduledTime` 기준으로 알림의 `remindAt`을 재계산한다.
-- 반복 Todo의 다음 회차가 없어 Todo가 `DONE`이 되면 알림 설정은 유지하되 향후 발송 후보에서는 제외한다.
 - Todo 삭제 시 연결 알림을 먼저 삭제한 뒤 Todo를 삭제한다.
 - 메인 Todo 삭제 시 하위 Todo를 벌크 삭제하기 전에 하위 Todo 알림을 먼저 삭제한다.
-- Todo 알림은 공지/시스템 알림처럼 별도 이력 보존 대상이 아니므로, 발송 이력 테이블을 따로 두지 않는다.
-- 향후 실제 발송 기능을 구현하면 `reminder`에 현재 회차 발송 여부를 나타내는 컬럼을 추가해 중복 발송을 방지한다.
-- 반복 Todo 다음 회차 이동 또는 일정 변경 시에는 같은 `reminder` row의 `remindAt`을 갱신하고 현재 회차 발송 상태를 초기화한다.
-- 목록 조회는 기존 subTodo fetch join 구조를 유지하고 알림을 조회하지 않는다.
+- Todo 목록 조회는 기존 subTodo fetch join 구조를 유지하고 알림은 조회하지 않는다.
 - Todo 목록의 알림 아이콘 표시용 필드 또는 `hasReminders` 제공은 후속 과제로 보류한다.
 - 상세 조회는 현재 Todo의 알림 상세만 포함한다.
 - 알림 컬렉션은 fetch join하지 않고 지연 로딩과 batch loading으로 조회한다.

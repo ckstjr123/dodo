@@ -1,8 +1,8 @@
 package com.dodo.todo.reminder.domain;
 
-import com.dodo.todo.category.domain.Category;
 import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
+import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.todo.domain.Todo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -10,8 +10,6 @@ import java.time.LocalTime;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static com.dodo.todo.util.TestFixture.createCategory;
-import static com.dodo.todo.util.TestFixture.createMember;
 import static com.dodo.todo.util.TestFixture.createScheduledTodo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,82 +17,107 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ReminderTest {
 
     @Test
-    @DisplayName("minuteOffset 기준으로 알림 시각을 계산한다")
-    void calculateRemindAtByMinuteOffset() {
-        Member member = createMember(1L);
-        Category category = createCategory(member, "work");
-        Todo todo = createScheduledTodo(10L, member, category, "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+    @DisplayName("상대 알림은 minuteOffset 설정을 저장한다")
+    void createRelativeReminder() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
 
-        Reminder reminder = Reminder.create(todo, member, 30);
+        RelativeReminder reminder = RelativeReminder.create(todo, member, 30);
 
-        assertThat(reminder.getRemindAt()).isEqualTo(LocalDateTime.of(2026, 5, 20, 8, 30));
+        assertThat(reminder.getType()).isEqualTo(ReminderType.RELATIVE);
+        assertThat(reminder.getMinuteOffset()).isEqualTo(30);
+        assertThat(reminder.calculateRemindAt()).isEqualTo(LocalDateTime.of(2026, 5, 20, 8, 30));
     }
 
     @Test
-    @DisplayName("계산된 알림 시각이 과거 날짜여도 생성할 수 있다")
-    void allowPastRemindAt() {
-        Member member = createMember(1L);
-        Category category = createCategory(member, "work");
-        Todo todo = createScheduledTodo(10L, member, category, "todo", LocalDate.of(2026, 5, 1), LocalTime.of(0, 10));
+    @DisplayName("절대 알림은 due 설정을 저장한다")
+    void createAbsoluteReminder() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
 
-        Reminder reminder = Reminder.create(todo, member, 30);
+        AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, due);
 
-        assertThat(reminder.getRemindAt()).isEqualTo(LocalDateTime.of(2026, 4, 30, 23, 40));
+        assertThat(reminder.getType()).isEqualTo(ReminderType.ABSOLUTE);
+        assertThat(reminder.getDue()).isEqualTo(due);
+        assertThat(reminder.calculateRemindAt()).isEqualTo(due);
     }
 
     @Test
-    @DisplayName("음수 minuteOffset으로 알림을 생성할 수 없다")
+    @DisplayName("due 없이 절대 알림을 생성할 수 없다")
+    void rejectCreateAbsoluteReminderWithoutDue() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+
+        assertThatThrownBy(() -> AbsoluteReminder.create(todo, member, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ReminderError.REMINDER_DUE_REQUIRED.message());
+    }
+
+    @Test
+    @DisplayName("음수 minuteOffset으로 상대 알림을 생성할 수 없다")
     void rejectNegativeMinuteOffset() {
-        Member member = createMember(1L);
-        Category category = createCategory(member, "work");
-        Todo todo = createScheduledTodo(10L, member, category, "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
 
-        assertThatThrownBy(() -> Reminder.create(todo, member, -1))
+        assertThatThrownBy(() -> RelativeReminder.create(todo, member, -1))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ReminderError.REMINDER_OFFSET_NEGATIVE.message());
     }
 
     @Test
-    @DisplayName("minuteOffset 수정 시 알림 시각을 재계산한다")
-    void updateMinuteOffsetRecalculatesRemindAt() {
-        Member member = createMember(1L);
-        Category category = createCategory(member, "work");
-        LocalDate scheduledDate = LocalDate.of(2026, 5, 20);
-        LocalTime scheduledTime = LocalTime.of(9, 0);
-        int changedMinuteOffset = 60;
-        Todo todo = createScheduledTodo(10L, member, category, "todo", scheduledDate, scheduledTime);
-        Reminder reminder = Reminder.create(todo, member, 10);
+    @DisplayName("상대 알림 수정은 타입을 유지하고 minuteOffset만 변경한다")
+    void updateRelativeReminder() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
 
-        reminder.updateMinuteOffset(changedMinuteOffset);
+        reminder.update(new ReminderUpdateRequest(30, null));
 
-        assertThat(reminder.getMinuteOffset()).isEqualTo(changedMinuteOffset);
-        assertThat(reminder.getRemindAt())
-                .isEqualTo(LocalDateTime.of(scheduledDate, scheduledTime).minusMinutes(changedMinuteOffset));
+        assertThat(reminder.getType()).isEqualTo(ReminderType.RELATIVE);
+        assertThat(reminder.getMinuteOffset()).isEqualTo(30);
     }
 
     @Test
-    @DisplayName("연관된 Todo 날짜를 통해 알림 시각을 재계산한다")
-    void rescheduleUsesAssociatedTodoSchedule() {
-        Member member = createMember(1L);
-        Category category = createCategory(member, "work");
-        Todo todo = createScheduledTodo(10L, member, category, "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
-        int minuteOffset = 15;
-        LocalDate changedDate = LocalDate.of(2026, 5, 21);
-        LocalTime changedTime = LocalTime.of(10, 0);
-        Reminder reminder = Reminder.create(todo, member, minuteOffset);
+    @DisplayName("상대 알림 수정 시 minuteOffset이 음수면 예외가 발생한다")
+    void rejectMissingMinuteOffsetSentinelWhenUpdate() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
 
-        todo.updateDetails(
-                category,
-                "updated",
-                null,
-                null,
-                null,
-                changedDate,
-                changedTime,
-                null
-        );
-        reminder.reschedule();
-
-        assertThat(reminder.getRemindAt()).isEqualTo(LocalDateTime.of(changedDate, changedTime).minusMinutes(minuteOffset));
+        assertThatThrownBy(() -> reminder.update(new ReminderUpdateRequest(null, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ReminderError.REMINDER_OFFSET_NEGATIVE.message());
     }
+
+    @Test
+    @DisplayName("절대 알림 수정은 타입을 유지하고 due만 변경한다")
+    void updateAbsoluteReminder() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
+        LocalDateTime changedDue = LocalDateTime.of(2026, 5, 21, 8, 0);
+
+        reminder.update(new ReminderUpdateRequest(null, changedDue));
+
+        assertThat(reminder.getType()).isEqualTo(ReminderType.ABSOLUTE);
+        assertThat(reminder.getDue()).isEqualTo(changedDue);
+    }
+
+    @Test
+    @DisplayName("절대 알림 수정 시 due가 없으면 예외가 발생한다")
+    void rejectUpdateAbsoluteReminderWithoutDue() {
+        Member member = member();
+        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
+
+        assertThatThrownBy(() -> reminder.update(new ReminderUpdateRequest(10, null)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ReminderError.REMINDER_DUE_REQUIRED.message());
+    }
+
+    private Member member() {
+        return Member.of("member@example.com");
+    }
+
 }

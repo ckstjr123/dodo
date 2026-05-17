@@ -30,7 +30,7 @@ public class CategoryController implements CategoryApiDocs {
     @ResponseStatus(HttpStatus.CREATED)
     public CategoryCreateResponse createCategory(@LoginMember Long memberId,
                                                  @Valid @RequestBody CategoryRequest request) {
-        return new CategoryCreateResponse(categoryService.createCategory(memberId, request));
+        return new CategoryCreateResponse(categoryService.saveCategory(memberId, request));
     }
 
     @Override

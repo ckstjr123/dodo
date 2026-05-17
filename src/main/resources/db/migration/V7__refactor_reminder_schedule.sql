@@ -1,0 +1,9 @@
+ALTER TABLE reminder
+    ADD COLUMN reminder_type VARCHAR(20) NOT NULL DEFAULT 'RELATIVE',
+    ADD COLUMN due DATETIME(6) NULL;
+
+ALTER TABLE reminder
+    MODIFY COLUMN minute_offset INT NULL;
+
+ALTER TABLE reminder
+    DROP COLUMN remind_at;

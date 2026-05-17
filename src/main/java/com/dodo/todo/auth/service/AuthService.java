@@ -107,7 +107,7 @@ public class AuthService {
         MemberPrincipal principal = new MemberPrincipal(member.getId());
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        createRefreshToken(member, refreshToken);
+        saveRefreshToken(member, refreshToken);
 
         return new TokenResponse(accessToken, refreshToken, "Bearer");
     }
@@ -149,7 +149,7 @@ public class AuthService {
                 .orElseGet(() -> memberRepository.save(Member.of(email)));
     }
 
-    private void createRefreshToken(Member member, String token) {
+    private void saveRefreshToken(Member member, String token) {
         RefreshToken refreshToken = new RefreshToken(
                 member,
                 token,

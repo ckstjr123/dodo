@@ -48,14 +48,13 @@ class CategoryServiceTest {
         Long memberId = 1L;
         Long categoryId = 10L;
         Member member = createMember(memberId);
-        Category category = createCategory(categoryId, member, "work");
         CategoryRequest request = new CategoryRequest("work");
 
         when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.empty());
         when(memberService.findById(memberId)).thenReturn(member);
-        when(categoryRepository.save(any(Category.class))).thenReturn(category);
+        when(categoryRepository.save(any(Category.class))).thenReturn(createCategory(categoryId, member, "work"));
 
-        Long savedCategoryId = categoryService.createCategory(memberId, request);
+        Long savedCategoryId = categoryService.saveCategory(memberId, request);
 
         assertThat(savedCategoryId).isEqualTo(categoryId);
     }
@@ -65,12 +64,13 @@ class CategoryServiceTest {
     void createCategoryReturnsExistingCategoryIdWhenNameDuplicated() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Category category = createCategory(categoryId, createMember(memberId), "work");
-        CategoryRequest request = new CategoryRequest("work");
+        String categoryName = "work";
+        Category category = createCategory(categoryId, createMember(memberId), categoryName);
+        CategoryRequest request = new CategoryRequest(categoryName);
 
         when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.of(category));
 
-        Long savedCategoryId = categoryService.createCategory(memberId, request);
+        Long savedCategoryId = categoryService.saveCategory(memberId, request);
 
         assertThat(savedCategoryId).isEqualTo(categoryId);
     }
@@ -99,7 +99,7 @@ class CategoryServiceTest {
     void updateCategoryChangesName() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Category category = createCategory(categoryId, createMember(memberId), "work");
+        Category category = createCategory(createMember(memberId), "work");
         CategoryRequest request = new CategoryRequest("personal");
 
         when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
@@ -146,7 +146,7 @@ class CategoryServiceTest {
     void deleteCategoryRejectsCategoryInUse() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Category category = createCategory(categoryId, createMember(memberId), "work");
+        Category category = createCategory(createMember(memberId), "work");
 
         when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
         when(todoRepository.existsByCategoryIdAndMemberId(categoryId, memberId)).thenReturn(true);
@@ -161,7 +161,7 @@ class CategoryServiceTest {
     void deleteCategoryDeletesOwnedCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Category category = createCategory(categoryId, createMember(memberId), "work");
+        Category category = createCategory(createMember(memberId), "work");
 
         when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
         when(todoRepository.existsByCategoryIdAndMemberId(categoryId, memberId)).thenReturn(false);

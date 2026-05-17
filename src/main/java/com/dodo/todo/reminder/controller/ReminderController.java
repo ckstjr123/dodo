@@ -1,8 +1,9 @@
 package com.dodo.todo.reminder.controller;
 
 import com.dodo.todo.auth.resolver.LoginMember;
-import com.dodo.todo.reminder.dto.ReminderRequest;
-import com.dodo.todo.reminder.dto.ReminderResponse;
+import com.dodo.todo.reminder.dto.ReminderCreateResponse;
+import com.dodo.todo.reminder.dto.ReminderCreateRequest;
+import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.reminder.service.ReminderService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,19 +27,20 @@ public class ReminderController implements ReminderApiDocs {
     @Override
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public ReminderResponse createReminder(@LoginMember Long memberId,
-                                           @PathVariable Long todoId,
-                                           @Valid @RequestBody ReminderRequest request) {
-        return reminderService.createReminder(memberId, todoId, request);
+    public ReminderCreateResponse createReminder(@LoginMember Long memberId,
+                                                 @PathVariable Long todoId,
+                                                 @Valid @RequestBody ReminderCreateRequest request) {
+        return new ReminderCreateResponse(reminderService.saveReminder(memberId, todoId, request));
     }
 
     @Override
     @PatchMapping("/{reminderId}")
-    public ReminderResponse updateReminder(@LoginMember Long memberId,
-                                           @PathVariable Long todoId,
-                                           @PathVariable Long reminderId,
-                                           @Valid @RequestBody ReminderRequest request) {
-        return reminderService.updateReminder(memberId, todoId, reminderId, request);
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void updateReminder(@LoginMember Long memberId,
+                               @PathVariable Long todoId,
+                               @PathVariable Long reminderId,
+                               @Valid @RequestBody ReminderUpdateRequest request) {
+        reminderService.updateReminder(memberId, todoId, reminderId, request);
     }
 
     @Override

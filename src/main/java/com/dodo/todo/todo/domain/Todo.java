@@ -27,7 +27,6 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -63,7 +62,7 @@ public class Todo extends BaseEntity {
     private List<Todo> subTodos = new ArrayList<>();
 
     @BatchSize(size = 100)
-    @OrderBy("remindAt ASC, id ASC")
+    @OrderBy("id ASC")
     @OneToMany(mappedBy = "todo")
     private List<Reminder> reminders = new ArrayList<>();
 
@@ -201,16 +200,9 @@ public class Todo extends BaseEntity {
         }
         validateRecurrenceSchedule(recurrence, scheduledDate);
 
-        boolean isScheduleChanged = !Objects.equals(this.scheduledDate, scheduledDate)
-                || !Objects.equals(this.scheduledTime, scheduledTime);
-
         this.scheduledDate = scheduledDate;
         this.scheduledTime = scheduledTime;
         this.recurrence = recurrence;
-
-        if (isScheduleChanged && scheduledDate != null && scheduledTime != null) {
-            rescheduleReminders();
-        }
     }
 
     /**
@@ -229,7 +221,6 @@ public class Todo extends BaseEntity {
         nextDate(completedAt).ifPresentOrElse(
                 nextDate -> {
                     scheduledDate = nextDate;
-                    rescheduleReminders();
                     resetSubTodos();
                 },
                 () -> {
@@ -282,10 +273,6 @@ public class Todo extends BaseEntity {
             subTodo.setStatus(TodoStatus.TODO);
             subTodo.completedAt = null;
         });
-    }
-
-    private void rescheduleReminders() {
-        reminders.forEach(Reminder::reschedule);
     }
 
     private void validateRecurrenceSchedule(TodoRecurrence recurrence, LocalDate scheduledDate) {

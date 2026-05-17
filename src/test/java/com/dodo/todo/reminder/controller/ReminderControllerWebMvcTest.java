@@ -4,11 +4,10 @@ import com.dodo.todo.auth.principal.MemberPrincipal;
 import com.dodo.todo.auth.resolver.LoginMemberArgumentResolver;
 import com.dodo.todo.common.config.WebMvcConfig;
 import com.dodo.todo.common.exception.GlobalExceptionHandler;
-import com.dodo.todo.reminder.dto.ReminderRequest;
-import com.dodo.todo.reminder.dto.ReminderResponse;
+import com.dodo.todo.reminder.dto.ReminderCreateRequest;
+import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.reminder.service.ReminderService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.time.LocalDateTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -56,41 +54,15 @@ class ReminderControllerWebMvcTest {
     void createReminderReturnsResponse() throws Exception {
         Long memberId = 1L;
         Long todoId = 10L;
-        when(reminderService.createReminder(eq(memberId), eq(todoId), any(ReminderRequest.class)))
-                .thenReturn(new ReminderResponse(100L, 10, LocalDateTime.of(2026, 5, 20, 8, 50)));
+        when(reminderService.saveReminder(eq(memberId), eq(todoId), any(ReminderCreateRequest.class)))
+                .thenReturn(100L);
         authenticate(memberId);
 
         mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", todoId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ReminderRequest(10))))
+                .content(objectMapper.writeValueAsString(new ReminderCreateRequest(null, 10, null))))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.reminderId").value(100L))
-                .andExpect(jsonPath("$.minuteOffset").value(10))
-                .andExpect(jsonPath("$.remindAt").value("2026-05-20T08:50:00"));
-    }
-
-    @Test
-    @DisplayName("minuteOffset이 없으면 알림 생성 요청에 실패한다")
-    void createReminderRejectsMissingMinuteOffset() throws Exception {
-        authenticate(1L);
-
-        mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", 10L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
-    }
-
-    @Test
-    @DisplayName("minuteOffset이 null이면 알림 생성 요청에 실패한다")
-    void createReminderRejectsNullMinuteOffset() throws Exception {
-        authenticate(1L);
-
-        mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", 10L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"minuteOffset\":null}"))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.reminderId").value(100L));
     }
 
     @Test
@@ -100,7 +72,7 @@ class ReminderControllerWebMvcTest {
 
         mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", 10L)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ReminderRequest(-1))))
+                        .content(objectMapper.writeValueAsString(new ReminderCreateRequest(null, -1, null))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -111,16 +83,12 @@ class ReminderControllerWebMvcTest {
         Long memberId = 1L;
         Long todoId = 10L;
         Long reminderId = 100L;
-        when(reminderService.updateReminder(eq(memberId), eq(todoId), eq(reminderId), any(ReminderRequest.class)))
-                .thenReturn(new ReminderResponse(reminderId, 30, LocalDateTime.of(2026, 5, 20, 8, 30)));
         authenticate(memberId);
 
         mockMvc.perform(patch("/api/v1/todos/{todoId}/reminders/{reminderId}", todoId, reminderId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ReminderRequest(30))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.reminderId").value(reminderId))
-                .andExpect(jsonPath("$.minuteOffset").value(30));
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(new ReminderUpdateRequest(30, null))))
+                .andExpect(status().isNoContent());
     }
 
     @Test
@@ -129,7 +97,6 @@ class ReminderControllerWebMvcTest {
         Long memberId = 1L;
         Long todoId = 10L;
         Long reminderId = 100L;
-        doNothing().when(reminderService).deleteReminder(memberId, todoId, reminderId);
         authenticate(memberId);
 
         mockMvc.perform(delete("/api/v1/todos/{todoId}/reminders/{reminderId}", todoId, reminderId))

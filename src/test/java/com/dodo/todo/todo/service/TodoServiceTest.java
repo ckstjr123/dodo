@@ -15,17 +15,9 @@ import com.dodo.todo.todo.domain.TodoHistory;
 import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.domain.recurrence.RecurrenceCriteria;
 import com.dodo.todo.todo.domain.recurrence.TodoRecurrence;
-import com.dodo.todo.todo.dto.ByDayRequest;
-import com.dodo.todo.todo.dto.RecurrenceRuleRequest;
-import com.dodo.todo.todo.dto.TodoRecurrenceRequest;
-import com.dodo.todo.todo.dto.TodoRequest;
-import com.dodo.todo.todo.dto.TodoUpdateRequest;
+import com.dodo.todo.todo.dto.*;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,19 +25,16 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static com.dodo.todo.util.TestFixture.createCategory;
-import static com.dodo.todo.util.TestFixture.createMember;
-import static com.dodo.todo.util.TestFixture.createRecurringTodo;
-import static com.dodo.todo.util.TestFixture.createScheduledTodo;
-import static com.dodo.todo.util.TestFixture.createSubTodo;
-import static com.dodo.todo.util.TestFixture.createTodo;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.util.Optional;
+
+import static com.dodo.todo.util.TestFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class TodoServiceTest {
@@ -92,22 +81,22 @@ class TodoServiceTest {
     void saveMainTodoSuccess() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Long savedTodoId = 7L;
+        Long todoId = 7L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo savedTodo = createTodo(savedTodoId, member, category, "title", TodoStatus.TODO);
+        Todo savedTodo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
         when(todoRepository.save(any(Todo.class))).thenReturn(savedTodo);
 
-        Long todoId = todoService.saveTodo(
+        Long savedTodoId = todoService.saveTodo(
                 memberId,
                 createTodoRequest(categoryId, null, LocalDate.of(2026, 4, 7), null)
         );
 
-        assertThat(todoId).isEqualTo(savedTodoId);
-        verify(reminderService).createReminders(savedTodo, member, null);
+        assertThat(savedTodoId).isEqualTo(todoId);
+        verify(reminderService).saveReminders(savedTodo, member, null);
     }
 
     @Test
@@ -118,8 +107,8 @@ class TodoServiceTest {
         Long mainTodoId = 8L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo mainTodo = createTodo(7L, member, category, "main", TodoStatus.TODO);
-        Todo subTodo = createSubTodo(member, category, mainTodo, "sub", TodoStatus.TODO, mainTodoId);
+        Todo mainTodo = createTodo(member, category, "main", TodoStatus.TODO);
+        Todo subTodo = createSubTodo(member, category, mainTodo, "sub", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
@@ -216,7 +205,6 @@ class TodoServiceTest {
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
         Todo todo = createRecurringTodo(
-                todoId,
                 member,
                 category,
                 "recurring",
@@ -242,8 +230,8 @@ class TodoServiceTest {
         Long subTodoId = 8L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo mainTodo = createTodo(7L, member, category, "main", TodoStatus.DONE);
-        Todo subTodo = createSubTodo(member, category, mainTodo, "sub", TodoStatus.DONE, subTodoId);
+        Todo mainTodo = createTodo(member, category, "main", TodoStatus.DONE);
+        Todo subTodo = createSubTodo(member, category, mainTodo, "sub", TodoStatus.DONE);
 
         when(todoRepository.findWithSubTodos(subTodoId, memberId)).thenReturn(Optional.of(subTodo));
 
@@ -295,7 +283,7 @@ class TodoServiceTest {
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
         Category updatedCategory = createCategory(member, "private");
-        Todo todo = createTodo(todoId, member, category, "before", TodoStatus.TODO);
+        Todo todo = createTodo(member, category, "before", TodoStatus.TODO);
         TodoUpdateRequest request = createTodoUpdateRequest(categoryId, LocalDate.of(2026, 4, 8), createTodoRecurrenceRequest(
                 new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
                 RecurrenceCriteria.SCHEDULED_DATE
@@ -321,7 +309,6 @@ class TodoServiceTest {
         Long todoId = 7L;
         Long categoryId = 10L;
         Member member = createMember(memberId);
-        Category category = createCategory(member, "work");
         TodoRecurrence recurrence = recurrence(
                 new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
                 RecurrenceCriteria.SCHEDULED_DATE
@@ -329,20 +316,10 @@ class TodoServiceTest {
         Todo todo = createScheduledTodo(
                 todoId,
                 member,
-                category,
+                "work",
                 "title",
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0)
-        );
-        todo.updateDetails(
-                category,
-                "title",
-                null,
-                null,
-                null,
-                LocalDate.of(2026, 4, 7),
-                LocalTime.of(14, 0),
-                recurrence
         );
         TodoUpdateRequest request = new TodoUpdateRequest(
                 categoryId,
@@ -360,7 +337,7 @@ class TodoServiceTest {
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(todo.getCategory());
 
         todoService.updateTodo(todoId, memberId, request);
 
@@ -377,11 +354,10 @@ class TodoServiceTest {
         Long todoId = 7L;
         Long categoryId = 10L;
         Member member = createMember(memberId);
-        Category category = createCategory(member, "work");
         Todo todo = createScheduledTodo(
                 todoId,
                 member,
-                category,
+                "work",
                 "title",
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0)
@@ -399,7 +375,7 @@ class TodoServiceTest {
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(category);
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(todo.getCategory());
 
         todoService.updateTodo(todoId, memberId, request);
 
@@ -415,7 +391,7 @@ class TodoServiceTest {
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
         Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
-        Todo doneTodo = createTodo(todoId, member, category, "title", TodoStatus.DONE);
+        Todo doneTodo = createTodo(member, category, "title", TodoStatus.DONE);
 
         when(todoRepository.findWithSubTodos(todoId, memberId))
                 .thenReturn(Optional.of(todo))
@@ -453,7 +429,7 @@ class TodoServiceTest {
         Long categoryId = 10L;
         Member member = createMember(memberId);
         Category category = createCategory(member, "work");
-        Todo todo = createTodo(todoId, member, category, "title", TodoStatus.TODO);
+        Todo todo = createTodo(member, category, "title", TodoStatus.TODO);
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
