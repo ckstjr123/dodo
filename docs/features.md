@@ -174,6 +174,7 @@
 ## Reminder
 
 - Reminder API는 `POST /api/v1/reminders`, `PATCH /api/v1/reminders/{reminderId}`, `DELETE /api/v1/reminders/{reminderId}`를 제공한다.
+- 생성 요청(`POST`) 시 Body에 `todoId`를 필수 포함한다.
 - 전체 삭제 API는 제공하지 않는다.
 - Todo 생성 시 초기 알림은 `reminders` 배열로 함께 생성할 수 있다.
 - Todo 수정 API에서는 알림 배열을 받지 않고, 알림 생성/수정/삭제는 Reminder API에서 관리한다.
@@ -182,13 +183,13 @@
 - 알림 타입은 `RELATIVE`, `ABSOLUTE`를 사용한다.
 - `RELATIVE` 알림은 Todo의 `scheduledDate`, `scheduledTime` 기준으로 `minuteOffset`분 전에 울린다.
 - `RELATIVE` 알림을 생성하거나 계산할 때 Todo에 `scheduledDate`, `scheduledTime`이 모두 있어야 한다.
-- `RELATIVE` 알림의 `minuteOffset`은 0 이상 정수여야 한다.
-- `RELATIVE` 요청에서 `minuteOffset`이 `null`이면 요청 DTO가 음수 sentinel 값을 반환하고, 엔티티 검증에서 실패한다.
+- `RELATIVE` 알림은 생성 시 `minuteOffset`이 필수이며, 0 이상의 정수여야 한다.
 - `ABSOLUTE` 알림은 Todo 일정과 별개로 요청의 `due` 시각에 울린다.
-- `ABSOLUTE` 알림의 `due`는 필수 값이다.
+- `ABSOLUTE` 알림은 생성 시 `due`가 필수 값이다.
 - 요청의 `type`이 없으면 기본 타입은 `RELATIVE`로 처리한다.
-- 생성 시 `type`에 맞는 필드만 사용하며, 다른 타입의 필드는 저장 로직에 반영하지 않는다.
-- 수정 시 기존 알림 구현체의 타입은 변경하지 않고, 해당 구현체에 필요한 필드만 반영한다.
+- DTO 레벨에서 `type`에 따른 필수 필드(`minuteOffset` 또는 `due`) 존재 여부를 조건부로 검증한다.
+- 수정(`PATCH`) 요청 시 `null`로 전달되거나 생략된 필드는 기존 값을 유지한다(Partial Update).
+- 수정 시 기존 알림의 타입(구현체)은 변경할 수 없으며, 해당 타입에 유효한 필드 값만 반영한다.
 - 서버는 `remindAt`을 컬럼으로 저장하지 않고, 구현체의 `calculateRemindAt()`으로 계산한다.
 - `RELATIVE` 알림의 계산 값은 `scheduledDate + scheduledTime - minuteOffset`이다.
 - `ABSOLUTE` 알림의 계산 값은 `due`이다.
