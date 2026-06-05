@@ -34,15 +34,15 @@ class TodoTest {
     @Test
     @DisplayName("다른 회원의 Todo면 소유자가 아니다")
     void isNotOwnedByOtherMemberEntity() {
-        Todo todo = todo(Member.of("member@example.com"));
+        Todo todo = todo(Member.from("member@example.com"));
 
-        assertThat(todo.isOwnedBy(Member.of("other@example.com"))).isFalse();
+        assertThat(todo.isOwnedBy(Member.from("other@example.com"))).isFalse();
     }
 
     @Test
     @DisplayName("메인 Todo가 있으면 subTodo다")
     void hasMainTodo() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo mainTodo = Todo.builder()
                 .member(member)
@@ -66,8 +66,8 @@ class TodoTest {
     @Test
     @DisplayName("다른 회원 Todo를 메인 Todo로 지정할 수 없다")
     void rejectNotOwnedMainTodo() {
-        Member member = Member.of("member@example.com");
-        Member otherMember = Member.of("other@example.com");
+        Member member = Member.from("member@example.com");
+        Member otherMember = Member.from("other@example.com");
         Category category = Category.create(member, "work");
         Category otherCategory = Category.create(otherMember, "work");
         Todo mainTodo = Todo.builder()
@@ -91,7 +91,7 @@ class TodoTest {
     @Test
     @DisplayName("일반 Todo를 완료하면 DONE 상태가 된다")
     void completeNormalTodo() {
-        Todo todo = todo(Member.of("member@example.com"));
+        Todo todo = todo(Member.from("member@example.com"));
 
         todo.complete(COMPLETED_AT);
 
@@ -101,7 +101,7 @@ class TodoTest {
     @Test
     @DisplayName("이미 완료된 Todo를 다시 완료하면 예외가 발생한다")
     void rejectCompleteDoneTodo() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo todo = Todo.builder()
                 .member(member)
@@ -118,7 +118,7 @@ class TodoTest {
     @Test
     @DisplayName("반복 Todo는 scheduledDate 없이 생성할 수 없다")
     void rejectRecurringTodoWithoutScheduledDate() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
 
         assertThatThrownBy(() -> Todo.builder()
@@ -138,7 +138,7 @@ class TodoTest {
     @Test
     @DisplayName("반복 Todo를 완료하면 다음 스케줄로 이동한다")
     void completeRecurringTodo() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 7);
         Todo todo = createRecurringTodo(
@@ -164,7 +164,7 @@ class TodoTest {
     @Test
     @DisplayName("완료일 기준 반복 Todo는 완료일을 기준으로 다음 스케줄로 이동한다")
     void completeRecurringTodoByCompletedDateCriteria() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 28);
         LocalDateTime completedAt = LocalDateTime.of(2026, 4, 30, 12, 0);
@@ -191,7 +191,7 @@ class TodoTest {
     @Test
     @DisplayName("완료일 기준 반복 Todo는 예정일 전에는 완료할 수 없다")
     void rejectCompleteCompletedDateCriteriaTodoBeforeScheduledDate() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo todo = createRecurringTodo(
                 1L,
@@ -213,7 +213,7 @@ class TodoTest {
     @Test
     @DisplayName("예정일 기준 반복 Todo는 예정일 전에도 완료할 수 있다")
     void completeScheduledDateCriteriaTodoBeforeScheduledDate() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 30);
         Todo todo = createRecurringTodo(
@@ -238,7 +238,7 @@ class TodoTest {
     @Test
     @DisplayName("반복 종료일에 도달한 Todo를 완료하면 다음 일정이 없어 DONE 상태가 된다")
     void completeRecurringTodoOnUntilDate() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 10), until = scheduledDate;
         Todo todo = createRecurringTodo(
@@ -263,7 +263,7 @@ class TodoTest {
     @Test
     @DisplayName("메인 Todo를 완료하면 하위 작업도 함께 완료된다")
     void completeMainTodoCompletesSubTodo() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo mainTodo = Todo.builder()
                 .member(member)
@@ -297,7 +297,7 @@ class TodoTest {
     @Test
     @DisplayName("반복 메인 Todo를 완료해 다음 일정으로 이동하면 하위 작업은 TODO로 초기화된다")
     void completeRecurringMainTodoResetsSubTodosWhenNextDateExists() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 7);
         Todo mainTodo = createRecurringTodo(
@@ -333,7 +333,7 @@ class TodoTest {
     @Test
     @DisplayName("반복 메인 Todo가 영구 완료되면 하위 작업도 함께 완료된다")
     void completeRecurringMainTodoCompletesSubTodosWhenNextDateDoesNotExist() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         LocalDate scheduledDate = LocalDate.of(2026, 4, 10);
         Todo mainTodo = createRecurringTodo(
@@ -368,7 +368,7 @@ class TodoTest {
     @Test
     @DisplayName("영구 완료된 반복 Todo를 TODO 상태로 복구할 수 있다")
     void undoRecurringDoneTodo() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo todo = Todo.builder()
                 .member(member)
@@ -398,7 +398,7 @@ class TodoTest {
     @Test
     @DisplayName("완료된 메인 Todo를 완료 취소하면 하위 작업도 함께 TODO로 복구된다")
     void undoDoneMainTodoRestoresSubTodos() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo mainTodo = Todo.builder()
                 .member(member)
@@ -428,7 +428,7 @@ class TodoTest {
     @Test
     @DisplayName("완료된 하위 Todo를 완료 취소하면 메인 Todo도 TODO로 복구하고 다른 하위 작업은 유지한다")
     void undoDoneSubTodoRestoresMainTodoOnly() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo mainTodo = Todo.builder()
                 .member(member)
@@ -470,7 +470,7 @@ class TodoTest {
     @Test
     @DisplayName("이미 TODO인 Todo를 완료 취소하면 예외가 발생한다")
     void rejectUndoNotCompletedTodo() {
-        Todo todo = todo(Member.of("member@example.com"));
+        Todo todo = todo(Member.from("member@example.com"));
 
         assertThatThrownBy(todo::undo)
                 .isInstanceOf(BusinessException.class)
@@ -480,7 +480,7 @@ class TodoTest {
     @Test
     @DisplayName("Todo 기본 정보를 수정한다")
     void updateDetails() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Category updatedCategory = Category.create(member, "private");
         Todo todo = Todo.builder()
@@ -514,7 +514,7 @@ class TodoTest {
     @Test
     @DisplayName("scheduledDate 제거 시 scheduledTime과 recurrence를 함께 제거한다")
     void clearTimeAndRecurrenceWhenDateRemoved() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         TodoRecurrence recurrence = recurrence(
                 new RecurrenceRule(Frequency.DAILY, 1, WeekDays.empty(), null, null),
@@ -542,7 +542,7 @@ class TodoTest {
     @Test
     @DisplayName("일정이 변경되어도 기존 알림 설정은 변경하지 않는다")
     void updateDetailsDoesNotChangeReminderSettingsWhenScheduleChanged() {
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
         Category category = Category.create(member, "work");
         Todo todo = Todo.builder()
                 .member(member)

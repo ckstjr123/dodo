@@ -16,6 +16,7 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     @ExceptionHandler
     public ErrorResponse handleException(Exception ex) {
+        log.error("handle Exception", ex);
         return ErrorResponse.of("INTERNAL_SERVER_ERROR", "오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     }
 

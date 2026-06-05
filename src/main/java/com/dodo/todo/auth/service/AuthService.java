@@ -1,8 +1,5 @@
 package com.dodo.todo.auth.service;
 
-import com.dodo.todo.auth.domain.RefreshToken;
-import com.dodo.todo.auth.repository.RefreshTokenRepository;
-import com.dodo.todo.auth.dto.MemberResponse;
 import com.dodo.todo.auth.dto.RefreshTokenRequest;
 import com.dodo.todo.auth.dto.SocialLoginRequest;
 import com.dodo.todo.auth.dto.TokenResponse;
@@ -15,20 +12,17 @@ import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import java.time.LocalDateTime;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
+@Transactional
 @RequiredArgsConstructor
 public class AuthService {
 
-    private static final int MAX_REFRESH_TOKEN_SESSIONS = 2;
-
     private final MemberRepository memberRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final OAuthClients oAuthClients;
 
@@ -41,65 +35,28 @@ public class AuthService {
         OAuthUserInfo userInfo = oAuthClients.authenticate(provider, request.accessToken());
         validateOAuthUserInfo(userInfo);
 
-        return completeLogin(userInfo);
+        Member member = findOrCreateMember(userInfo.email());
+        return issueTokenResponse(member);
     }
 
-    @Transactional
+    /**
+     * refresh token 재발급
+     * 요청 토큰과 회원에 저장된 토큰이 일치하면 새 토큰 쌍으로 교체한다.
+     */
     public TokenResponse refresh(RefreshTokenRequest request) {
         if (!jwtTokenProvider.isValidRefreshToken(request.refreshToken())) {
-            throw new BusinessException(
-                    "INVALID_REFRESH_TOKEN",
-                    HttpStatus.UNAUTHORIZED.value(),
-                    "Refresh token is invalid"
-            );
+            throw invalidRefreshTokenException();
         }
 
-        RefreshToken storedRefreshToken = refreshTokenRepository.findByToken(request.refreshToken())
-                .orElseThrow(() -> new BusinessException(
-                        "INVALID_REFRESH_TOKEN",
-                        HttpStatus.UNAUTHORIZED.value(),
-                        "Refresh token is invalid"
-                ));
-        LocalDateTime now = LocalDateTime.now();
-
-        if (storedRefreshToken.isExpired(now)) {
-            refreshTokenRepository.delete(storedRefreshToken);
-            throw new BusinessException(
-                    "INVALID_REFRESH_TOKEN",
-                    HttpStatus.UNAUTHORIZED.value(),
-                    "Refresh token is invalid"
-            );
-        }
-
-        Long memberId = storedRefreshToken.getMemberId();
-        MemberPrincipal principal = new MemberPrincipal(memberId);
-
-        String accessToken = jwtTokenProvider.generateAccessToken(principal);
-        String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        storedRefreshToken.rotate(
-                refreshToken,
-                now.plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
-        );
-        cleanUpRefreshTokens(memberId);
-
-        return new TokenResponse(accessToken, refreshToken, "Bearer");
-    }
-
-    @Transactional(readOnly = true)
-    public MemberResponse getCurrentMember(Long memberId) {
+        Long memberId = jwtTokenProvider.getMemberId(request.refreshToken());
         Member member = memberRepository.findById(memberId)
-                .orElseThrow(() -> new BusinessException(
-                        "MEMBER_NOT_FOUND",
-                        HttpStatus.NOT_FOUND.value(),
-                        "Member not found"
-                ));
+                .orElseThrow(this::invalidRefreshTokenException);
 
-        return new MemberResponse(member.getId(), member.getEmail());
-    }
+        if (member.getRefreshToken() == null
+                || !member.getRefreshToken().isValidRefreshToken(request.refreshToken())) {
+            throw invalidRefreshTokenException();
+        }
 
-    @Transactional
-    public TokenResponse issueTokenResponse(MemberPrincipal principal) {
-        Member member = memberRepository.getReferenceById(principal.getId());
         return issueTokenResponse(member);
     }
 
@@ -107,15 +64,12 @@ public class AuthService {
         MemberPrincipal principal = new MemberPrincipal(member.getId());
         String accessToken = jwtTokenProvider.generateAccessToken(principal);
         String refreshToken = jwtTokenProvider.generateRefreshToken(principal);
-        saveRefreshToken(member, refreshToken);
 
+        member.changeRefreshToken(
+                refreshToken,
+                LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
+        );
         return new TokenResponse(accessToken, refreshToken, "Bearer");
-    }
-
-    @Transactional
-    protected TokenResponse completeLogin(OAuthUserInfo userInfo) {
-        Member member = findOrCreateMember(userInfo.email());
-        return issueTokenResponse(member);
     }
 
     private void validateOAuthUserInfo(OAuthUserInfo userInfo) {
@@ -146,26 +100,14 @@ public class AuthService {
 
     private Member findOrCreateMember(String email) {
         return memberRepository.findByEmail(email)
-                .orElseGet(() -> memberRepository.save(Member.of(email)));
+                .orElseGet(() -> memberRepository.save(Member.from(email)));
     }
 
-    private void saveRefreshToken(Member member, String token) {
-        RefreshToken refreshToken = new RefreshToken(
-                member,
-                token,
-                LocalDateTime.now().plusSeconds(jwtTokenProvider.getRefreshTokenExpirationSeconds())
+    private BusinessException invalidRefreshTokenException() {
+        return new BusinessException(
+                "INVALID_REFRESH_TOKEN",
+                HttpStatus.UNAUTHORIZED.value(),
+                "Refresh token is invalid"
         );
-        refreshTokenRepository.save(refreshToken);
-        cleanUpRefreshTokens(member.getId());
-    }
-
-    private void cleanUpRefreshTokens(Long memberId) {
-        // 최근 사용 기준으로 최대 2개의 세션만 남긴다.
-        List<RefreshToken> refreshTokens = refreshTokenRepository.findByMember_IdOrderByUpdatedAtDescIdDesc(memberId);
-        if (refreshTokens.size() <= MAX_REFRESH_TOKEN_SESSIONS) {
-            return;
-        }
-
-        refreshTokenRepository.deleteAll(refreshTokens.subList(MAX_REFRESH_TOKEN_SESSIONS, refreshTokens.size()));
     }
 }

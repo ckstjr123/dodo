@@ -17,7 +17,4 @@ public interface AuthApiDocs {
     @Operation(summary = "리프레시 토큰으로 토큰 재발급")
     TokenResponse refresh(RefreshTokenRequest request);
 
-    @Operation(summary = "현재 로그인한 회원 조회")
-    @SecurityRequirement(name = "bearerAuth")
-    MemberResponse me(Long memberId);
 }

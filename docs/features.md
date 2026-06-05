@@ -140,7 +140,9 @@
 - Todo 알림 설정은 `reminder` 테이블 하나로 관리한다.
 - `reminder`는 싱글 테이블 상속 구조를 사용하며, 구현체가 알림 예정 시각을 계산한다.
 - 반복 Todo가 다음 회차로 이동하거나 일정이 변경되면 기존 `RELATIVE` 알림은 변경된 Todo 일정 기준으로 다시 계산된다.
-- 실제 발송 기능과 발송 상태 저장 방식은 후속 설계 범위다.
+- 실제 푸시 발송은 Firebase Cloud Messaging을 사용한다.
+- FCM token은 회원당 하나만 저장하며, 인증된 사용자가 `PATCH /api/v1/members/me/fcm-token`으로 최신 token을 등록/교체한다.
+- 푸시 발송 설정이 없으면 no-op으로 무시하지 않고 애플리케이션 런타임 설정 오류로 드러나야 한다.
 
 ## SubTodos
 
@@ -171,7 +173,7 @@
 
 ## Reminder
 
-- Reminder API는 `POST /api/v1/todos/{todoId}/reminders`, `PATCH /api/v1/todos/{todoId}/reminders/{reminderId}`, `DELETE /api/v1/todos/{todoId}/reminders/{reminderId}`를 제공한다.
+- Reminder API는 `POST /api/v1/reminders`, `PATCH /api/v1/reminders/{reminderId}`, `DELETE /api/v1/reminders/{reminderId}`를 제공한다.
 - 전체 삭제 API는 제공하지 않는다.
 - Todo 생성 시 초기 알림은 `reminders` 배열로 함께 생성할 수 있다.
 - Todo 수정 API에서는 알림 배열을 받지 않고, 알림 생성/수정/삭제는 Reminder API에서 관리한다.
@@ -200,4 +202,17 @@
 - Todo 목록의 알림 아이콘 표시용 필드 또는 `hasReminders` 제공은 후속 과제로 보류한다.
 - 상세 조회는 현재 Todo의 알림 상세만 포함한다.
 - 알림 컬렉션은 fetch join하지 않고 지연 로딩과 batch loading으로 조회한다.
-- 실제 FCM 발송, 디바이스 토큰, 중복 발송 방지용 `sentAt` 또는 발송 이력 테이블은 후속 설계 범위다.
+
+## Push Notification
+
+- 실제 FCM 발송을 지원한다.
+- FCM token은 회원당 하나만 저장한다.
+- 인증된 사용자는 `PATCH /api/v1/members/me/fcm-token`으로 FCM token을 등록하거나 교체한다.
+- Firebase 서비스 계정 설정이 없으면 no-op으로 무시하지 않고 런타임 설정 오류가 발생해야 한다.
+- Reminder 생성/수정 시 `calculateRemindAt()` 결과가 미래이면 서버 메모리에 런타임 예약을 등록한다.
+- Reminder 수정 시 기존 예약을 취소하고 재예약한다.
+- Reminder 삭제 또는 Todo 삭제 시 연결된 예약을 취소한다.
+- Todo 일정이 변경되면 연결된 Reminder의 발송 시각을 다시 계산해 재예약한다.
+- 발송 직전에는 Reminder 존재 여부, Todo가 `TODO` 상태인지, 계산된 발송 시각이 현재 이하인지 다시 확인한다.
+- `remindAt`을 컬럼으로 저장하지 않는다.
+- 단일 서버와 단순 예약을 전제로 하며, 서버 재시작 중 예약 복구와 중복/누락 방지는 지원하지 않는다.

@@ -43,6 +43,9 @@ class ReminderServiceTest {
     @Mock
     private ReminderRepository reminderRepository;
 
+    @Mock
+    private ReminderScheduleService reminderScheduleService;
+
     @InjectMocks
     private ReminderService reminderService;
 
@@ -60,9 +63,10 @@ class ReminderServiceTest {
         when(reminderRepository.countByTodoId(todoId)).thenReturn(0);
         when(reminderRepository.save(any(Reminder.class))).thenReturn(reminder);
 
-        Long savedReminderId = reminderService.saveReminder(memberId, todoId, new ReminderCreateRequest(null, 10, null));
+        Long savedReminderId = reminderService.saveReminder(memberId, new ReminderCreateRequest(todoId, null, 10, null));
 
         assertThat(savedReminderId).isEqualTo(reminderId);
+        verify(reminderScheduleService).schedule(reminder);
     }
 
     @Test
@@ -82,8 +86,7 @@ class ReminderServiceTest {
 
         Long savedReminderId = reminderService.saveReminder(
                 memberId,
-                todoId,
-                new ReminderCreateRequest(ReminderType.ABSOLUTE, null, due)
+                new ReminderCreateRequest(todoId, ReminderType.ABSOLUTE, null, due)
         );
 
         assertThat(savedReminderId).isEqualTo(reminderId);
@@ -106,8 +109,7 @@ class ReminderServiceTest {
 
         Long savedReminderId = reminderService.saveReminder(
                 memberId,
-                todoId,
-                new ReminderCreateRequest(ReminderType.ABSOLUTE, null, due)
+                new ReminderCreateRequest(todoId, ReminderType.ABSOLUTE, null, due)
         );
 
         assertThat(savedReminderId).isEqualTo(reminderId);
@@ -128,13 +130,13 @@ class ReminderServiceTest {
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
 
-        assertThatThrownBy(() -> reminderService.saveReminder(memberId, todoId, new ReminderCreateRequest(null, 10, null)))
+        assertThatThrownBy(() -> reminderService.saveReminder(memberId, new ReminderCreateRequest(todoId, null, 10, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ReminderError.REMINDER_SCHEDULE_REQUIRED.message());
     }
 
     @Test
-    @DisplayName("Todo 하나에 알림을 5개 초과로 생성할 수 없다")
+    @DisplayName("각 todo 알림은 5개 이하여야 한다")
     void rejectReminderLimitExceeded() {
         Long memberId = 1L;
         Long todoId = 10L;
@@ -144,7 +146,7 @@ class ReminderServiceTest {
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
         when(reminderRepository.countByTodoId(todoId)).thenReturn(5);
 
-        assertThatThrownBy(() -> reminderService.saveReminder(memberId, todoId, new ReminderCreateRequest(null, 10, null)))
+        assertThatThrownBy(() -> reminderService.saveReminder(memberId, new ReminderCreateRequest(todoId, null, 10, null)))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(ReminderError.REMINDER_LIMIT_EXCEEDED.message());
     }
@@ -153,59 +155,36 @@ class ReminderServiceTest {
     @DisplayName("상대 알림 설정을 수정한다")
     void updateReminderOverwritesSettings() {
         Long memberId = 1L;
-        Long todoId = 10L;
         Long reminderId = 100L;
+        int minuteOffset = 30;
         Member member = createMember(memberId);
         Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
-        when(reminderRepository.findByIdAndTodoIdAndMemberId(reminderId, todoId, memberId))
+        when(reminderRepository.findByIdAndMemberId(reminderId, memberId))
                 .thenReturn(Optional.of(reminder));
 
-        reminderService.updateReminder(memberId, todoId, reminderId, new ReminderUpdateRequest(30, null));
+        reminderService.updateReminder(memberId, reminderId, new ReminderUpdateRequest(minuteOffset, null));
 
         assertThat(reminder.getType()).isEqualTo(ReminderType.RELATIVE);
-        assertThat(reminder.getMinuteOffset()).isEqualTo(30);
-    }
-
-    @Test
-    @DisplayName("상대 알림 수정 시 minuteOffset이 null이면 음수 offset으로 처리되어 실패한다")
-    void rejectUpdateRelativeReminderWithNullMinuteOffset() {
-        Long memberId = 1L;
-        Long todoId = 10L;
-        Long reminderId = 100L;
-        Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
-        Reminder reminder = RelativeReminder.create(todo, member, 10);
-        when(reminderRepository.findByIdAndTodoIdAndMemberId(reminderId, todoId, memberId))
-                .thenReturn(Optional.of(reminder));
-
-        assertThatThrownBy(() -> reminderService.updateReminder(
-                memberId,
-                todoId,
-                reminderId,
-                new ReminderUpdateRequest(null, null)
-        ))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ReminderError.REMINDER_OFFSET_NEGATIVE.message());
+        assertThat(reminder.getMinuteOffset()).isEqualTo(minuteOffset);
+        verify(reminderScheduleService).schedule(reminder);
     }
 
     @Test
     @DisplayName("절대 알림의 due를 수정한다")
     void updateAbsoluteReminder() {
         Long memberId = 1L;
-        Long todoId = 10L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
         Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
         LocalDateTime changedDue = LocalDateTime.of(2026, 5, 21, 8, 0);
         AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, due);
-        when(reminderRepository.findByIdAndTodoIdAndMemberId(reminderId, todoId, memberId))
+        when(reminderRepository.findByIdAndMemberId(reminderId, memberId))
                 .thenReturn(Optional.of(reminder));
 
         reminderService.updateReminder(
                 memberId,
-                todoId,
                 reminderId,
                 new ReminderUpdateRequest(null, changedDue)
         );
@@ -215,19 +194,19 @@ class ReminderServiceTest {
     }
 
     @Test
-    @DisplayName("요청한 Todo와 Member에 속한 알림만 삭제한다")
+    @DisplayName("요청한 Member에 속한 알림만 삭제한다")
     void deleteReminder() {
         Long memberId = 1L;
-        Long todoId = 10L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
         Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         Reminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
-        when(reminderRepository.findByIdAndTodoIdAndMemberId(reminderId, todoId, memberId))
+        when(reminderRepository.findByIdAndMemberId(reminderId, memberId))
                 .thenReturn(Optional.of(reminder));
 
-        reminderService.deleteReminder(memberId, todoId, reminderId);
+        reminderService.deleteReminder(memberId, reminderId);
 
+        verify(reminderScheduleService).cancel(reminderId);
         verify(reminderRepository).delete(reminder);
     }
 
@@ -245,8 +224,8 @@ class ReminderServiceTest {
         when(reminderRepository.saveAll(anyList())).thenReturn(List.of(reminder1, reminder2));
 
         List<Long> savedReminderIds = reminderService.saveReminders(todo, member, List.of(
-                new ReminderCreateRequest(null, minuteOffset1, null),
-                new ReminderCreateRequest(null, minuteOffset2, null)
+                new ReminderCreateRequest(todoId, null, minuteOffset1, null),
+                new ReminderCreateRequest(todoId, null, minuteOffset2, null)
         ));
 
         assertThat(savedReminderIds).containsExactly(reminderId1, reminderId2);

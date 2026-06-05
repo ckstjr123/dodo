@@ -54,13 +54,13 @@ class ReminderControllerWebMvcTest {
     void createReminderReturnsResponse() throws Exception {
         Long memberId = 1L;
         Long todoId = 10L;
-        when(reminderService.saveReminder(eq(memberId), eq(todoId), any(ReminderCreateRequest.class)))
+        when(reminderService.saveReminder(eq(memberId), any(ReminderCreateRequest.class)))
                 .thenReturn(100L);
         authenticate(memberId);
 
-        mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", todoId)
+        mockMvc.perform(post("/api/v1/reminders")
                         .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(new ReminderCreateRequest(null, 10, null))))
+                .content(objectMapper.writeValueAsString(new ReminderCreateRequest(todoId, null, 10, null))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.reminderId").value(100L));
     }
@@ -70,9 +70,9 @@ class ReminderControllerWebMvcTest {
     void createReminderRejectsNegativeMinuteOffset() throws Exception {
         authenticate(1L);
 
-        mockMvc.perform(post("/api/v1/todos/{todoId}/reminders", 10L)
+        mockMvc.perform(post("/api/v1/reminders")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ReminderCreateRequest(null, -1, null))))
+                        .content(objectMapper.writeValueAsString(new ReminderCreateRequest(10L, null, -1, null))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
@@ -81,11 +81,10 @@ class ReminderControllerWebMvcTest {
     @DisplayName("알림 수정 요청은 수정된 알림 정보를 반환한다")
     void updateReminderReturnsResponse() throws Exception {
         Long memberId = 1L;
-        Long todoId = 10L;
         Long reminderId = 100L;
         authenticate(memberId);
 
-        mockMvc.perform(patch("/api/v1/todos/{todoId}/reminders/{reminderId}", todoId, reminderId)
+        mockMvc.perform(patch("/api/v1/reminders/{reminderId}", reminderId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(new ReminderUpdateRequest(30, null))))
                 .andExpect(status().isNoContent());
@@ -95,11 +94,10 @@ class ReminderControllerWebMvcTest {
     @DisplayName("알림 삭제 요청은 204를 반환한다")
     void deleteReminderReturnsNoContent() throws Exception {
         Long memberId = 1L;
-        Long todoId = 10L;
         Long reminderId = 100L;
         authenticate(memberId);
 
-        mockMvc.perform(delete("/api/v1/todos/{todoId}/reminders/{reminderId}", todoId, reminderId))
+        mockMvc.perform(delete("/api/v1/reminders/{reminderId}", reminderId))
                 .andExpect(status().isNoContent());
     }
 

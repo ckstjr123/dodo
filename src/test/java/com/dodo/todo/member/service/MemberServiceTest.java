@@ -6,6 +6,7 @@ import static org.mockito.Mockito.when;
 
 import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
+import com.dodo.todo.member.dto.FcmTokenRequest;
 import com.dodo.todo.member.repository.MemberRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
@@ -29,7 +30,7 @@ class MemberServiceTest {
     void findById() {
         Long memberId = 1L;
         String email = "member@example.com";
-        Member member = Member.of(email);
+        Member member = Member.from(email);
 
         when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
 
@@ -49,5 +50,18 @@ class MemberServiceTest {
         assertThatThrownBy(() -> memberService.findById(missingMemberId))
                 .isInstanceOf(BusinessException.class)
                 .hasMessage(expectedMessage);
+    }
+
+    @Test
+    @DisplayName("회원의 FCM token을 변경한다")
+    void updateFcmToken() {
+        Long memberId = 1L;
+        Member member = Member.from("member@example.com");
+
+        when(memberRepository.findById(memberId)).thenReturn(Optional.of(member));
+
+        memberService.updateFcmToken(memberId, new FcmTokenRequest("fcm-token"));
+
+        assertThat(member.getFcmToken()).isEqualTo("fcm-token");
     }
 }

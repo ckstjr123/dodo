@@ -43,14 +43,14 @@ class CategoryServiceTest {
     private CategoryService categoryService;
 
     @Test
-    @DisplayName("새 카테고리를 생성하고 생성된 카테고리 ID를 반환한다")
+    @DisplayName("create category returns new category id")
     void createCategoryReturnsNewCategoryId() {
         Long memberId = 1L;
         Long categoryId = 10L;
         Member member = createMember(memberId);
         CategoryRequest request = new CategoryRequest("work");
 
-        when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.empty());
+        when(categoryRepository.findByMember_IdAndName(memberId, request.name())).thenReturn(Optional.empty());
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryRepository.save(any(Category.class))).thenReturn(createCategory(categoryId, member, "work"));
 
@@ -60,7 +60,7 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("카테고리 추가 시 동일한 이름의 카테고리가 있으면 기존 카테고리 ID를 반환한다")
+    @DisplayName("create category returns existing category id when name duplicated")
     void createCategoryReturnsExistingCategoryIdWhenNameDuplicated() {
         Long memberId = 1L;
         Long categoryId = 10L;
@@ -68,7 +68,7 @@ class CategoryServiceTest {
         Category category = createCategory(categoryId, createMember(memberId), categoryName);
         CategoryRequest request = new CategoryRequest(categoryName);
 
-        when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.of(category));
+        when(categoryRepository.findByMember_IdAndName(memberId, request.name())).thenReturn(Optional.of(category));
 
         Long savedCategoryId = categoryService.saveCategory(memberId, request);
 
@@ -76,14 +76,14 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("회원이 소유한 카테고리 목록을 조회한다")
+    @DisplayName("get categories returns member categories")
     void getCategoriesReturnsMemberCategories() {
         Long memberId = 1L;
         Member member = createMember(memberId);
         Category work = createCategory(10L, member, "work");
         Category personal = createCategory(11L, member, "personal");
 
-        when(categoryRepository.findAllByMemberIdOrderByCreatedAtAscIdAsc(memberId))
+        when(categoryRepository.findAllByMember_IdOrderByCreatedAtAscIdAsc(memberId))
                 .thenReturn(List.of(work, personal));
 
         CategoryListResponse response = categoryService.getCategories(memberId);
@@ -95,15 +95,15 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("본인 카테고리 명을 수정한다")
+    @DisplayName("update category changes name")
     void updateCategoryChangesName() {
         Long memberId = 1L;
         Long categoryId = 10L;
         Category category = createCategory(createMember(memberId), "work");
         CategoryRequest request = new CategoryRequest("personal");
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
-        when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.empty());
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByMember_IdAndName(memberId, request.name())).thenReturn(Optional.empty());
 
         categoryService.updateCategory(memberId, categoryId, request);
 
@@ -111,7 +111,7 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("다른 본인 카테고리와 이름이 중복되면 수정할 수 없다")
+    @DisplayName("update category rejects duplicated name")
     void updateCategoryRejectsDuplicatedName() {
         Long memberId = 1L;
         Long categoryId = 10L;
@@ -119,8 +119,8 @@ class CategoryServiceTest {
         Category duplicatedCategory = createCategory(11L, createMember(memberId), "personal");
         CategoryRequest request = new CategoryRequest("personal");
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
-        when(categoryRepository.findByMemberIdAndName(memberId, request.name())).thenReturn(Optional.of(duplicatedCategory));
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByMember_IdAndName(memberId, request.name())).thenReturn(Optional.of(duplicatedCategory));
 
         assertThatThrownBy(() -> categoryService.updateCategory(memberId, categoryId, request))
                 .isInstanceOf(BusinessException.class)
@@ -128,13 +128,13 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않거나 소유자가 다른 카테고리는 수정할 수 없다")
+    @DisplayName("update category rejects missing category")
     void updateCategoryRejectsNotFoundCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
         CategoryRequest request = new CategoryRequest("personal");
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.empty());
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> categoryService.updateCategory(memberId, categoryId, request))
                 .isInstanceOf(BusinessException.class)
@@ -142,13 +142,13 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("Todo가 연결된 카테고리는 삭제할 수 없다")
+    @DisplayName("delete category rejects category in use")
     void deleteCategoryRejectsCategoryInUse() {
         Long memberId = 1L;
         Long categoryId = 10L;
         Category category = createCategory(createMember(memberId), "work");
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.of(category));
         when(todoRepository.existsByCategoryIdAndMemberId(categoryId, memberId)).thenReturn(true);
 
         assertThatThrownBy(() -> categoryService.deleteCategory(memberId, categoryId))
@@ -157,13 +157,13 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("Todo가 연결되지 않은 본인 카테고리를 삭제한다")
+    @DisplayName("delete category deletes owned category")
     void deleteCategoryDeletesOwnedCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
         Category category = createCategory(createMember(memberId), "work");
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.of(category));
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.of(category));
         when(todoRepository.existsByCategoryIdAndMemberId(categoryId, memberId)).thenReturn(false);
 
         categoryService.deleteCategory(memberId, categoryId);
@@ -172,12 +172,12 @@ class CategoryServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않거나 소유자가 다른 카테고리는 삭제할 수 없다")
+    @DisplayName("delete category rejects missing category")
     void deleteCategoryRejectsNotFoundCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
 
-        when(categoryRepository.findByIdAndMemberId(categoryId, memberId)).thenReturn(Optional.empty());
+        when(categoryRepository.findByIdAndMember_Id(categoryId, memberId)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> categoryService.deleteCategory(memberId, categoryId))
                 .isInstanceOf(BusinessException.class)

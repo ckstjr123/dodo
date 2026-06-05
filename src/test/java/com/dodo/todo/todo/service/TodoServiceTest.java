@@ -62,7 +62,7 @@ class TodoServiceTest {
     void saveTodoRejectsUnavailableCategory() {
         Long memberId = 1L;
         Long categoryId = 10L;
-        Member member = Member.of("member@example.com");
+        Member member = Member.from("member@example.com");
 
         when(memberService.findById(memberId)).thenReturn(member);
         when(categoryService.findByIdAndMemberId(categoryId, memberId))

@@ -26,18 +26,20 @@ public class ReminderService {
     private final MemberService memberService;
     private final TodoRepository todoRepository;
     private final ReminderRepository reminderRepository;
+    private final ReminderScheduleService reminderScheduleService;
 
     /**
      * 알림 생성
      * 알림 타입별 설정값을 검증한 뒤 Todo에 알림을 추가한다.
      */
     @Transactional
-    public Long saveReminder(Long memberId, Long todoId, ReminderCreateRequest request) {
+    public Long saveReminder(Long memberId, ReminderCreateRequest request) {
         Member member = memberService.findById(memberId);
-        Todo todo = findTodo(todoId, memberId);
+        Todo todo = findTodo(request.todoId(), memberId);
         validateReminderLimit(todo.getId(), 1);
 
         Reminder reminder = reminderRepository.save(ReminderFactory.create(todo, member, request));
+        reminderScheduleService.schedule(reminder);
 
         return reminder.getId();
     }
@@ -56,7 +58,10 @@ public class ReminderService {
         List<Reminder> reminders = requests.stream()
                 .map(request -> ReminderFactory.create(todo, member, request))
                 .toList();
-        return reminderRepository.saveAll(reminders).stream()
+        List<Reminder> savedReminders = reminderRepository.saveAll(reminders);
+        savedReminders.forEach(reminderScheduleService::schedule);
+
+        return savedReminders.stream()
                 .map(Reminder::getId)
                 .toList();
     }
@@ -66,20 +71,22 @@ public class ReminderService {
      * 기존 알림 row를 유지하고 타입별 설정값만 변경한다.
      */
     @Transactional
-    public void updateReminder(Long memberId, Long todoId, Long reminderId, ReminderUpdateRequest request) {
-        Reminder reminder = findReminder(memberId, todoId, reminderId);
+    public void updateReminder(Long memberId, Long reminderId, ReminderUpdateRequest request) {
+        Reminder reminder = findReminder(memberId, reminderId);
 
         reminder.update(request);
+        reminderScheduleService.schedule(reminder);
     }
 
     /**
      * 알림 삭제
-     * 요청한 Todo에 속한 알림만 삭제한다.
+     * 요청한 회원의 알림을 삭제한다.
      */
     @Transactional
-    public void deleteReminder(Long memberId, Long todoId, Long reminderId) {
-        Reminder reminder = findReminder(memberId, todoId, reminderId);
+    public void deleteReminder(Long memberId, Long reminderId) {
+        Reminder reminder = findReminder(memberId, reminderId);
 
+        reminderScheduleService.cancel(reminderId);
         reminderRepository.delete(reminder);
     }
 
@@ -89,7 +96,19 @@ public class ReminderService {
      */
     @Transactional
     public void deleteRemindersByTodoId(Long todoId) {
+        reminderRepository.findIdsByTodoId(todoId)
+                .forEach(reminderScheduleService::cancel);
         reminderRepository.deleteByTodoId(todoId);
+    }
+
+    /**
+     * Todo Reminder 재예약
+     * Todo 일정이 변경된 경우 연결된 알림 예약을 다시 계산한다.
+     */
+    @Transactional(readOnly = true)
+    public void rescheduleRemindersByTodoId(Long todoId) {
+        reminderRepository.findAllByTodoId(todoId)
+                .forEach(reminderScheduleService::schedule);
     }
 
     /**
@@ -98,6 +117,8 @@ public class ReminderService {
      */
     @Transactional
     public void deleteRemindersByParentTodoId(Long parentTodoId) {
+        reminderRepository.findIdsByParentTodoId(parentTodoId)
+                .forEach(reminderScheduleService::cancel);
         reminderRepository.deleteByParentTodoId(parentTodoId);
     }
 
@@ -108,8 +129,8 @@ public class ReminderService {
         }
     }
 
-    private Reminder findReminder(Long memberId, Long todoId, Long reminderId) {
-        return reminderRepository.findByIdAndTodoIdAndMemberId(reminderId, todoId, memberId)
+    private Reminder findReminder(Long memberId, Long reminderId) {
+        return reminderRepository.findByIdAndMemberId(reminderId, memberId)
                 .orElseThrow(() -> new BusinessException(ReminderError.REMINDER_NOT_FOUND));
     }
 

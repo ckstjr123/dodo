@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/todos/{todoId}/reminders")
+@RequestMapping("/api/v1/reminders")
 @RequiredArgsConstructor
 public class ReminderController implements ReminderApiDocs {
 
@@ -28,27 +28,24 @@ public class ReminderController implements ReminderApiDocs {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ReminderCreateResponse createReminder(@LoginMember Long memberId,
-                                                 @PathVariable Long todoId,
                                                  @Valid @RequestBody ReminderCreateRequest request) {
-        return new ReminderCreateResponse(reminderService.saveReminder(memberId, todoId, request));
+        return new ReminderCreateResponse(reminderService.saveReminder(memberId, request));
     }
 
     @Override
     @PatchMapping("/{reminderId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateReminder(@LoginMember Long memberId,
-                               @PathVariable Long todoId,
                                @PathVariable Long reminderId,
                                @Valid @RequestBody ReminderUpdateRequest request) {
-        reminderService.updateReminder(memberId, todoId, reminderId, request);
+        reminderService.updateReminder(memberId, reminderId, request);
     }
 
     @Override
     @DeleteMapping("/{reminderId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteReminder(@LoginMember Long memberId,
-                               @PathVariable Long todoId,
                                @PathVariable Long reminderId) {
-        reminderService.deleteReminder(memberId, todoId, reminderId);
+        reminderService.deleteReminder(memberId, reminderId);
     }
 }

@@ -1,6 +1,7 @@
 package com.dodo.todo.member.service;
 
 import com.dodo.todo.common.exception.BusinessException;
+import com.dodo.todo.member.dto.FcmTokenRequest;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,5 +27,16 @@ public class MemberService {
                         HttpStatus.NOT_FOUND.value(),
                         "Member not found"
                 ));
+    }
+
+    /**
+     * FCM token 변경
+     * 로그인한 회원의 디바이스 토큰을 최신 값으로 교체한다.
+     */
+    @Transactional
+    public void updateFcmToken(Long memberId, FcmTokenRequest request) {
+        Member member = findById(memberId);
+
+        member.updateFcmToken(request.fcmToken());
     }
 }

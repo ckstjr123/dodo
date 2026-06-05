@@ -39,8 +39,10 @@ public class RelativeReminder extends Reminder {
 
     @Override
     public void update(ReminderUpdateRequest request) {
-        validateMinuteOffset(request.minuteOffset());
-        this.minuteOffset = request.minuteOffset();
+        if (request.minuteOffset() != null) {
+            validateMinuteOffset(request.minuteOffset());
+            this.minuteOffset = request.minuteOffset();
+        }
     }
 
     @Override
@@ -61,5 +63,4 @@ public class RelativeReminder extends Reminder {
             throw new BusinessException(ReminderError.REMINDER_OFFSET_NEGATIVE);
         }
     }
-
 }

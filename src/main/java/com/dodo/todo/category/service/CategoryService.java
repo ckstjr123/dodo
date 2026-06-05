@@ -29,7 +29,7 @@ public class CategoryService {
      */
     @Transactional
     public Long saveCategory(Long memberId, CategoryRequest request) {
-        return categoryRepository.findByMemberIdAndName(memberId, request.name())
+        return categoryRepository.findByMember_IdAndName(memberId, request.name())
                 .map(Category::getId)
                 .orElseGet(() -> saveCategory(memberId, request.name()));
     }
@@ -40,7 +40,7 @@ public class CategoryService {
      */
     @Transactional(readOnly = true)
     public CategoryListResponse getCategories(Long memberId) {
-        List<CategoryResponse> categories = categoryRepository.findAllByMemberIdOrderByCreatedAtAscIdAsc(memberId)
+        List<CategoryResponse> categories = categoryRepository.findAllByMember_IdOrderByCreatedAtAscIdAsc(memberId)
                 .stream()
                 .map(CategoryResponse::from)
                 .toList();
@@ -84,7 +84,7 @@ public class CategoryService {
 
     @Transactional(readOnly = true)
     public Category findByIdAndMemberId(Long categoryId, Long memberId) {
-        return categoryRepository.findByIdAndMemberId(categoryId, memberId)
+        return categoryRepository.findByIdAndMember_Id(categoryId, memberId)
                 .orElseThrow(() -> new BusinessException(CategoryError.CATEGORY_NOT_FOUND));
     }
 
@@ -93,7 +93,7 @@ public class CategoryService {
      * 대상 카테고리가 아니면서 동일한 이름을 가진 자신의 카테고리가 이미 있으면 중복.
      */
     private void validateDuplicateName(Category category, Long memberId, String name) {
-        categoryRepository.findByMemberIdAndName(memberId, name)
+        categoryRepository.findByMember_IdAndName(memberId, name)
                 .filter(findCategory -> !findCategory.getId().equals(category.getId()))
                 .ifPresent(duplicatedCategory -> {
                     throw new BusinessException(CategoryError.CATEGORY_DUPLICATED);

@@ -12,13 +12,13 @@ public interface ReminderApiDocs {
 
     @Operation(summary = "알림 생성")
     @SecurityRequirement(name = "bearerAuth")
-    ReminderCreateResponse createReminder(Long memberId, Long todoId, ReminderCreateRequest request);
+    ReminderCreateResponse createReminder(Long memberId, ReminderCreateRequest request);
 
     @Operation(summary = "알림 수정")
     @SecurityRequirement(name = "bearerAuth")
-    void updateReminder(Long memberId, Long todoId, Long reminderId, ReminderUpdateRequest request);
+    void updateReminder(Long memberId, Long reminderId, ReminderUpdateRequest request);
 
     @Operation(summary = "알림 삭제")
     @SecurityRequirement(name = "bearerAuth")
-    void deleteReminder(Long memberId, Long todoId, Long reminderId);
+    void deleteReminder(Long memberId, Long reminderId);
 }

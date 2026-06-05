@@ -7,9 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CategoryRepository extends JpaRepository<Category, Long> {
 
-    List<Category> findAllByMemberIdOrderByCreatedAtAscIdAsc(Long memberId);
+    List<Category> findAllByMember_IdOrderByCreatedAtAscIdAsc(Long memberId);
 
-    Optional<Category> findByIdAndMemberId(Long categoryId, Long memberId);
+    Optional<Category> findByIdAndMember_Id(Long categoryId, Long memberId);
 
-    Optional<Category> findByMemberIdAndName(Long memberId, String name);
+    Optional<Category> findByMember_IdAndName(Long memberId, String name);
 }

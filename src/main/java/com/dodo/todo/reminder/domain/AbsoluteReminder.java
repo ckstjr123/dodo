@@ -38,8 +38,10 @@ public class AbsoluteReminder extends Reminder {
 
     @Override
     public void update(ReminderUpdateRequest request) {
-        validateDue(request.due());
-        this.due = request.due();
+        if (request.due() != null) {
+            validateDue(request.due());
+            this.due = request.due();
+        }
     }
 
     @Override

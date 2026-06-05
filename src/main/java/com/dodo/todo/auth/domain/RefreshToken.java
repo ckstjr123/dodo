@@ -1,68 +1,43 @@
 package com.dodo.todo.auth.domain;
 
-import com.dodo.todo.common.entity.BaseEntity;
-import com.dodo.todo.member.domain.Member;
 import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.Embeddable;
 import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Getter
-@Entity
-@Table(name = "refresh_token")
+@Embeddable
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class RefreshToken extends BaseEntity {
+public class RefreshToken {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "member_id", nullable = false)
-    private Member member;
-
-    @Column(nullable = false, length = 512)
+    @Column(name = "refresh_token", length = 512)
     private String token;
 
-    @Column(name = "expired_at", nullable = false)
+    @Column(name = "refresh_token_expired_at")
     private LocalDateTime expiredAt;
 
-    public RefreshToken(Member member, String token, LocalDateTime expiredAt) {
-        validateMember(member);
-        this.member = member;
+    public RefreshToken(String token, LocalDateTime expiredAt) {
         this.token = token;
         this.expiredAt = expiredAt;
-    }
-
-    public Long getMemberId() {
-        return member.getId();
-    }
-
-    public boolean isExpired(LocalDateTime now) {
-        return expiredAt.isBefore(now) || expiredAt.isEqual(now);
     }
 
     /**
-     * 리프레시 토큰 교체
-     * 같은 세션 row를 재사용하면서 토큰과 만료 시각만 갱신함.
+     * refresh token 유효성 확인
+     * 저장된 토큰과 요청 토큰이 일치하고 아직 만료되지 않았는지 판단한다.
      */
-    public void rotate(String token, LocalDateTime expiredAt) {
-        this.token = token;
-        this.expiredAt = expiredAt;
+    public boolean isValidRefreshToken(String token) {
+        return this.token != null
+                && this.token.equals(token)
+                && !isExpired();
     }
 
-    private void validateMember(Member member) {
-        if (member == null) {
-            throw new IllegalArgumentException("Member is required");
-        }
+    /**
+     * refresh token 만료 여부 확인
+     * 만료 시각이 현재보다 이후가 아니면 만료된 토큰으로 판단한다.
+     */
+    public boolean isExpired() {
+        return expiredAt == null || !expiredAt.isAfter(LocalDateTime.now());
     }
 }

@@ -100,7 +100,10 @@ public class TodoService {
 
         if (request.scheduledDate() == null || request.scheduledTime() == null) {
             reminderService.deleteRemindersByTodoId(todo.getId());
+            return;
         }
+
+        reminderService.rescheduleRemindersByTodoId(todo.getId());
     }
 
     @Transactional

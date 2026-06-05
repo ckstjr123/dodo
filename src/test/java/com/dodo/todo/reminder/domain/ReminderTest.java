@@ -79,18 +79,6 @@ class ReminderTest {
     }
 
     @Test
-    @DisplayName("상대 알림 수정 시 minuteOffset이 음수면 예외가 발생한다")
-    void rejectMissingMinuteOffsetSentinelWhenUpdate() {
-        Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
-        RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
-
-        assertThatThrownBy(() -> reminder.update(new ReminderUpdateRequest(null, null)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ReminderError.REMINDER_OFFSET_NEGATIVE.message());
-    }
-
-    @Test
     @DisplayName("절대 알림 수정은 타입을 유지하고 due만 변경한다")
     void updateAbsoluteReminder() {
         Member member = member();
@@ -104,20 +92,8 @@ class ReminderTest {
         assertThat(reminder.getDue()).isEqualTo(changedDue);
     }
 
-    @Test
-    @DisplayName("절대 알림 수정 시 due가 없으면 예외가 발생한다")
-    void rejectUpdateAbsoluteReminderWithoutDue() {
-        Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
-        AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
-
-        assertThatThrownBy(() -> reminder.update(new ReminderUpdateRequest(10, null)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ReminderError.REMINDER_DUE_REQUIRED.message());
-    }
-
     private Member member() {
-        return Member.of("member@example.com");
+        return Member.from("member@example.com");
     }
 
 }

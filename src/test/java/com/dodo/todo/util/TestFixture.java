@@ -22,7 +22,7 @@ public final class TestFixture {
     }
 
     public static Member createMember(Long id, String email) {
-        Member member = Member.of(email);
+        Member member = Member.from(email);
         setId(member, id);
         return member;
     }
