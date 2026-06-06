@@ -39,7 +39,7 @@ public abstract class Reminder extends BaseEntity {
     }
 
     protected void validateSchedule(Todo todo) {
-        if (todo.getScheduledDate() == null || todo.getScheduledTime() == null) {
+        if (!todo.hasScheduledDate() || !todo.hasScheduledTime()) {
             throw new BusinessException(ReminderError.REMINDER_SCHEDULE_REQUIRED);
         }
     }

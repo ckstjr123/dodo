@@ -21,12 +21,14 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.OrderBy;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import lombok.AccessLevel;
 import lombok.Builder;
@@ -95,6 +97,9 @@ public class Todo extends BaseEntity {
     @Column(name = "recurrence", columnDefinition = "json")
     private TodoRecurrence recurrence;
 
+    @Transient
+    private boolean isScheduleChanged;
+
     @Builder
     private Todo(
             Member member,
@@ -116,7 +121,9 @@ public class Todo extends BaseEntity {
         if (status == null) {
             throw new BusinessException(TodoError.TODO_STATUS_REQUIRED);
         }
-        validateRecurrenceSchedule(recurrence, scheduledDate);
+        if (recurrence != null && scheduledDate == null) {
+            throw new BusinessException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED);
+        }
         this.member = member;
         this.category = category;
         this.mainTodo = mainTodo;
@@ -152,6 +159,14 @@ public class Todo extends BaseEntity {
 
     public boolean hasMainTodo() {
         return mainTodo != null;
+    }
+
+    public boolean hasScheduledDate() {
+        return scheduledDate != null;
+    }
+
+    public boolean hasScheduledTime() {
+        return scheduledTime != null;
     }
 
     public List<Todo> getSubTodos() {
@@ -198,8 +213,12 @@ public class Todo extends BaseEntity {
             scheduledTime = null;
             recurrence = null;
         }
-        validateRecurrenceSchedule(recurrence, scheduledDate);
 
+        if (!Objects.equals(this.scheduledDate, scheduledDate)
+                || !Objects.equals(this.scheduledTime, scheduledTime)) {
+            this.isScheduleChanged = true;
+        }
+        
         this.scheduledDate = scheduledDate;
         this.scheduledTime = scheduledTime;
         this.recurrence = recurrence;
@@ -273,12 +292,6 @@ public class Todo extends BaseEntity {
             subTodo.setStatus(TodoStatus.TODO);
             subTodo.completedAt = null;
         });
-    }
-
-    private void validateRecurrenceSchedule(TodoRecurrence recurrence, LocalDate scheduledDate) {
-        if (recurrence != null && scheduledDate == null) {
-            throw new BusinessException(TodoError.RECURRING_TODO_SCHEDULED_DATE_REQUIRED);
-        }
     }
 
 }

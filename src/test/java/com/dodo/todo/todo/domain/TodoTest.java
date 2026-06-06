@@ -563,6 +563,42 @@ class TodoTest {
         assertThat(reminder.getMinuteOffset()).isEqualTo(minuteOffset);
     }
 
+    @Test
+    @DisplayName("Todo 일정을 변경하면 isScheduleChanged 필드 값은 true가 된다")
+    void updateScheduleSetsScheduleChangedFlag() {
+        Member member = Member.from("member@example.com");
+        Category category = Category.create(member, "work");
+        String title = "title";
+        LocalDate date = LocalDate.of(2026, 6, 7);
+        LocalTime time = LocalTime.of(14, 0);
+        Todo todo = Todo.builder()
+                .member(member)
+                .category(category)
+                .title("todo")
+                .status(TodoStatus.TODO)
+                .scheduledDate(date)
+                .scheduledTime(time)
+                .build();
+
+        assertThat(todo.isScheduleChanged()).isFalse();
+
+        // 일정이 기존과 동일
+        todo.updateDetails(category, title, null, null, null, date, time, null);
+        assertThat(todo.isScheduleChanged()).isFalse();
+
+        // 날짜 변경
+        todo.updateDetails(category, title, null, null, null, date.plusDays(1), time, null);
+        assertThat(todo.isScheduleChanged()).isTrue();
+
+        // 이미 일정이 한번 변경된 이후 기존과 동일한 일정
+        todo.updateDetails(category, title, null, null, null, date.plusDays(1), time, null);
+        assertThat(todo.isScheduleChanged()).isTrue();
+        
+        // 시간 변경
+        todo.updateDetails(category, title, null, null, null, date.plusDays(1), time.plusHours(1), null);
+        assertThat(todo.isScheduleChanged()).isTrue();
+    }
+
     private Todo todo(Member member) {
         Category category = Category.create(member, "work");
 

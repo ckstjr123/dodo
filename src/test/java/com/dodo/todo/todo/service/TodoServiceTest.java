@@ -406,6 +406,42 @@ class TodoServiceTest {
     }
 
     @Test
+    @DisplayName("Todo 일정이 변경되고 날짜와 시간이 모두 존재하면 알림을 재예약한다")
+    void updateTodoReschedulesRemindersWhenScheduleChanged() {
+        Long memberId = 1L;
+        Long todoId = 7L;
+        Long categoryId = 10L;
+        Member member = createMember(memberId);
+        Todo todo = createScheduledTodo(
+                todoId,
+                member,
+                "work",
+                "title",
+                TodoStatus.TODO,
+                LocalDate.of(2026, 4, 7),
+                LocalTime.of(14, 0)
+        );
+        TodoUpdateRequest request = new TodoUpdateRequest(
+                categoryId,
+                "updated title",
+                "updated memo",
+                2,
+                null,
+                LocalDate.of(2026, 4, 8),
+                LocalTime.of(15, 0),
+                null
+        );
+
+        when(memberService.findById(memberId)).thenReturn(member);
+        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
+        when(categoryService.findByIdAndMemberId(categoryId, memberId)).thenReturn(todo.getCategory());
+
+        todoService.updateTodo(todoId, memberId, request);
+
+        verify(reminderService).rescheduleRemindersByTodoId(todo.getId());
+    }
+
+    @Test
     @DisplayName("다른 회원의 Todo는 수정할 수 없다")
     void updateTodoRejectsForeignTodo() {
         Long memberId = 1L;

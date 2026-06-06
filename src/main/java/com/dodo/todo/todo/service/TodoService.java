@@ -18,7 +18,10 @@ import com.dodo.todo.todo.dto.TodoResponse;
 import com.dodo.todo.todo.dto.TodoUpdateRequest;
 import com.dodo.todo.todo.repository.TodoHistoryRepository;
 import com.dodo.todo.todo.repository.TodoRepository;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -98,12 +101,14 @@ public class TodoService {
                 recurrence
         );
 
-        if (request.scheduledDate() == null || request.scheduledTime() == null) {
+        if (!todo.hasScheduledDate() || !todo.hasScheduledTime()) {
             reminderService.deleteRemindersByTodoId(todo.getId());
             return;
         }
 
-        reminderService.rescheduleRemindersByTodoId(todo.getId());
+        if (todo.isScheduleChanged()) {
+            reminderService.rescheduleRemindersByTodoId(todo.getId());
+        }
     }
 
     @Transactional
