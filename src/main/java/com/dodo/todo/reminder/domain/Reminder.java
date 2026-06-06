@@ -1,25 +1,16 @@
 package com.dodo.todo.reminder.domain;
 
 import com.dodo.todo.common.entity.BaseEntity;
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.todo.domain.Todo;
-import jakarta.persistence.DiscriminatorColumn;
-import jakarta.persistence.DiscriminatorType;
-import jakarta.persistence.Entity;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Inheritance;
-import jakarta.persistence.InheritanceType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+
+import java.time.LocalDateTime;
 
 @Getter
 @Entity
@@ -42,8 +33,15 @@ public abstract class Reminder extends BaseEntity {
     private Member member;
 
     protected Reminder(Todo todo, Member member) {
+        validateSchedule(todo);
         this.todo = todo;
         this.member = member;
+    }
+
+    protected void validateSchedule(Todo todo) {
+        if (todo.getScheduledDate() == null || todo.getScheduledTime() == null) {
+            throw new BusinessException(ReminderError.REMINDER_SCHEDULE_REQUIRED);
+        }
     }
 
     /**

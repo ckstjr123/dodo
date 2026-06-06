@@ -1,7 +1,7 @@
-package com.dodo.todo.push.controller;
+package com.dodo.todo.notification.controller;
 
-import com.dodo.todo.push.dto.PushTestRequest;
-import com.dodo.todo.push.service.PushService;
+import com.dodo.todo.notification.dto.PushTestRequest;
+import com.dodo.todo.notification.service.NotificationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class PushTestController {
 
-    private final PushService pushService;
+    private final NotificationService notificationService;
 
     /**
      * 임시 푸시 알림 발송
@@ -25,6 +25,6 @@ public class PushTestController {
     @PostMapping("/test")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void sendTestPush(@Valid @RequestBody PushTestRequest request) {
-        pushService.send(request.fcmToken(), request.title(), request.body());
+        notificationService.send(request.fcmToken(), request.title(), request.body());
     }
 }

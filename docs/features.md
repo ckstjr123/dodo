@@ -181,10 +181,10 @@
 - Todo 하나의 알림은 최대 5개까지 허용한다.
 - 알림은 JPA 싱글 테이블 상속 매핑을 사용하며 `reminder_type`으로 구현체를 구분한다.
 - 알림 타입은 `RELATIVE`, `ABSOLUTE`를 사용한다.
+- 모든 알림을 생성하거나 계산할 때 Todo에 `scheduledDate`, `scheduledTime`이 모두 있어야 한다.
 - `RELATIVE` 알림은 Todo의 `scheduledDate`, `scheduledTime` 기준으로 `minuteOffset`분 전에 울린다.
-- `RELATIVE` 알림을 생성하거나 계산할 때 Todo에 `scheduledDate`, `scheduledTime`이 모두 있어야 한다.
 - `RELATIVE` 알림은 생성 시 `minuteOffset`이 필수이며, 0 이상의 정수여야 한다.
-- `ABSOLUTE` 알림은 Todo 일정과 별개로 요청의 `due` 시각에 울린다.
+- `ABSOLUTE` 알림은 요청의 `due` 시각에 울린다.
 - `ABSOLUTE` 알림은 생성 시 `due`가 필수 값이다.
 - 요청의 `type`이 없으면 기본 타입은 `RELATIVE`로 처리한다.
 - DTO 레벨에서 `type`에 따른 필수 필드(`minuteOffset` 또는 `due`) 존재 여부를 조건부로 검증한다.

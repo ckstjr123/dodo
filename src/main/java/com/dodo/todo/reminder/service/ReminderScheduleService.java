@@ -1,6 +1,6 @@
 package com.dodo.todo.reminder.service;
 
-import com.dodo.todo.push.service.PushService;
+import com.dodo.todo.notification.service.NotificationService;
 import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
@@ -21,7 +21,7 @@ public class ReminderScheduleService {
 
     private final TaskScheduler taskScheduler;
     private final ReminderRepository reminderRepository;
-    private final PushService pushService;
+    private final NotificationService notificationService;
     private final Map<Long, ScheduledFuture<?>> schedules = new ConcurrentHashMap<>();
 
     /**
@@ -73,7 +73,7 @@ public class ReminderScheduleService {
     }
 
     private void sendPush(Reminder reminder) {
-        pushService.send(
+        notificationService.send(
                 reminder.getMember().getFcmToken(),
                 "Todo 알림",
                 reminder.getTodo().getTitle()

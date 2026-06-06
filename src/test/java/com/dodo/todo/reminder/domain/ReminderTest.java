@@ -55,6 +55,25 @@ class ReminderTest {
     }
 
     @Test
+    @DisplayName("일정이 없는 Todo에 알림을 생성할 수 없다")
+    void rejectReminderWithoutTodoSchedule() {
+        Member member = member();
+        Todo todo = Todo.builder()
+                .member(member)
+                .title("title")
+                .build();
+        LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
+
+        assertThatThrownBy(() -> AbsoluteReminder.create(todo, member, due))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ReminderError.REMINDER_SCHEDULE_REQUIRED.message());
+
+        assertThatThrownBy(() -> RelativeReminder.create(todo, member, 10))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage(ReminderError.REMINDER_SCHEDULE_REQUIRED.message());
+    }
+
+    @Test
     @DisplayName("음수 minuteOffset으로 상대 알림을 생성할 수 없다")
     void rejectNegativeMinuteOffset() {
         Member member = member();

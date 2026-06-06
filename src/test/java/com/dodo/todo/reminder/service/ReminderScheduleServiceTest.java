@@ -11,7 +11,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.dodo.todo.member.domain.Member;
-import com.dodo.todo.push.service.PushService;
+import com.dodo.todo.notification.service.NotificationService;
 import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
@@ -38,7 +38,7 @@ class ReminderScheduleServiceTest {
     private ReminderRepository reminderRepository;
 
     @Mock
-    private PushService pushService;
+    private NotificationService notificationService;
 
     @Mock
     private ScheduledFuture<Object> scheduledFuture;
@@ -79,7 +79,7 @@ class ReminderScheduleServiceTest {
 
         reminderScheduleService.send(reminderId);
 
-        verify(pushService).send("fcm-token", "Todo 알림", reminder.getTodo().getTitle());
+        verify(notificationService).send("fcm-token", "Todo 알림", reminder.getTodo().getTitle());
     }
 
     @Test
@@ -92,7 +92,7 @@ class ReminderScheduleServiceTest {
 
         reminderScheduleService.send(reminderId);
 
-        verify(pushService, never()).send(any(), any(), any());
+        verify(notificationService, never()).send(any(), any(), any());
     }
 
     private Reminder futureReminder(Long reminderId) {

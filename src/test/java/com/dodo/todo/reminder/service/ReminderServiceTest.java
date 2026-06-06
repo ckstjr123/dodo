@@ -1,6 +1,5 @@
 package com.dodo.todo.reminder.service;
 
-import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.reminder.domain.*;
@@ -8,7 +7,6 @@ import com.dodo.todo.reminder.dto.ReminderCreateRequest;
 import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
-import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.repository.TodoRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,7 +23,6 @@ import java.util.Optional;
 
 import static com.dodo.todo.util.TestFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
@@ -90,49 +87,6 @@ class ReminderServiceTest {
         );
 
         assertThat(savedReminderId).isEqualTo(reminderId);
-    }
-
-    @Test
-    @DisplayName("절대 알림은 Todo 일정이 없어도 due만 있으면 생성한다")
-    void saveAbsoluteReminderWithoutSchedule() {
-        Long memberId = 1L;
-        Long todoId = 10L;
-        Long reminderId = 100L;
-        Member member = createMember(memberId);
-        Todo todo = createTodo(todoId, member, createCategory(member, "work"), "todo", TodoStatus.TODO);
-        LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
-        Reminder reminder = createAbsoluteReminder(reminderId, todo, member, due);
-        when(memberService.findById(memberId)).thenReturn(member);
-        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-        when(reminderRepository.countByTodoId(todoId)).thenReturn(0);
-        when(reminderRepository.save(any(Reminder.class))).thenReturn(reminder);
-
-        Long savedReminderId = reminderService.saveReminder(
-                memberId,
-                new ReminderCreateRequest(todoId, ReminderType.ABSOLUTE, null, due)
-        );
-
-        assertThat(savedReminderId).isEqualTo(reminderId);
-    }
-
-    @Test
-    @DisplayName("Todo 일정이 없으면 상대 알림을 생성할 수 없다")
-    void rejectCreateReminderWithoutSchedule() {
-        Long memberId = 1L;
-        Long todoId = 10L;
-        Member member = createMember(memberId);
-        Todo todo = Todo.builder()
-                .member(member)
-                .category(createCategory(member, "work"))
-                .title("todo")
-                .status(TodoStatus.TODO)
-                .build();
-        when(memberService.findById(memberId)).thenReturn(member);
-        when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
-
-        assertThatThrownBy(() -> reminderService.saveReminder(memberId, new ReminderCreateRequest(todoId, null, 10, null)))
-                .isInstanceOf(BusinessException.class)
-                .hasMessage(ReminderError.REMINDER_SCHEDULE_REQUIRED.message());
     }
 
     @Test

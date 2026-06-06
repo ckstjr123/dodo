@@ -65,7 +65,6 @@ class JwtTokenProviderTest {
         String malformedToken = "not-a-token";
         JwtTokenProvider jwtTokenProvider = new JwtTokenProvider(jwtProperties(accessExpirationSeconds, refreshExpirationSeconds));
 
-        assertThat(jwtTokenProvider.isValidToken(malformedToken)).isFalse();
         assertThat(jwtTokenProvider.isValidAccessToken(malformedToken)).isFalse();
         assertThat(jwtTokenProvider.isValidRefreshToken(malformedToken)).isFalse();
     }

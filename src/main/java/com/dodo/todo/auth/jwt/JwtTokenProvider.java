@@ -40,15 +40,6 @@ public class JwtTokenProvider {
         return Long.valueOf(parseClaims(token).getSubject());
     }
 
-    public boolean isValidToken(String token) {
-        try {
-            parseClaims(token);
-            return true;
-        } catch (JwtException | IllegalArgumentException exception) {
-            return false;
-        }
-    }
-
     public boolean isValidAccessToken(String token) {
         return isValidTokenOfType(token, ACCESS_TOKEN_TYPE);
     }

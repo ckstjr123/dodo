@@ -1,4 +1,4 @@
-package com.dodo.todo.push.dto;
+package com.dodo.todo.notification.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;

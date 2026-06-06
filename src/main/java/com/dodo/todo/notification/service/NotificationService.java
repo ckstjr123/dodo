@@ -1,4 +1,4 @@
-package com.dodo.todo.push.service;
+package com.dodo.todo.notification.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -6,7 +6,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
-public class PushService {
+public class NotificationService {
 
     private final PushSender pushSender;
 

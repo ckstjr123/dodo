@@ -1,4 +1,4 @@
-package com.dodo.todo.push.config;
+package com.dodo.todo.notification.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

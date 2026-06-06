@@ -1,4 +1,4 @@
-package com.dodo.todo.push.service;
+package com.dodo.todo.notification.service;
 
 public interface PushSender {
 

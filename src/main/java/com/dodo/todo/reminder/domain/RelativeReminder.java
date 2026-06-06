@@ -23,7 +23,6 @@ public class RelativeReminder extends Reminder {
 
     private RelativeReminder(Todo todo, Member member, int minuteOffset) {
         super(todo, member);
-        validateSchedule(todo);
         validateMinuteOffset(minuteOffset);
         this.minuteOffset = minuteOffset;
     }
@@ -50,12 +49,6 @@ public class RelativeReminder extends Reminder {
         validateSchedule(getTodo());
         return LocalDateTime.of(getTodo().getScheduledDate(), getTodo().getScheduledTime())
                 .minusMinutes(minuteOffset);
-    }
-
-    private void validateSchedule(Todo todo) {
-        if (todo.getScheduledDate() == null || todo.getScheduledTime() == null) {
-            throw new BusinessException(ReminderError.REMINDER_SCHEDULE_REQUIRED);
-        }
     }
 
     private void validateMinuteOffset(int minuteOffset) {

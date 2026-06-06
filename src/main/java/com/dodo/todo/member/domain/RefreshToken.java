@@ -1,8 +1,10 @@
-package com.dodo.todo.auth.domain;
+package com.dodo.todo.member.domain;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import java.time.LocalDateTime;
+import java.util.Objects;
+
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,6 +21,12 @@ public class RefreshToken {
     private LocalDateTime expiredAt;
 
     public RefreshToken(String token, LocalDateTime expiredAt) {
+        if (token == null || token.isBlank()) {
+            throw new IllegalArgumentException("갱신 토큰 값은 필수입니다.");
+        }
+        if (expiredAt == null) {
+            throw new IllegalArgumentException("갱신 토큰 만료 시간은 필수입니다.");
+        }
         this.token = token;
         this.expiredAt = expiredAt;
     }
@@ -28,9 +36,7 @@ public class RefreshToken {
      * 저장된 토큰과 요청 토큰이 일치하고 아직 만료되지 않았는지 판단한다.
      */
     public boolean isValidRefreshToken(String token) {
-        return this.token != null
-                && this.token.equals(token)
-                && !isExpired();
+        return this.token.equals(token) && !isExpired();
     }
 
     /**

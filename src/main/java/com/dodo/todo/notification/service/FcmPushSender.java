@@ -1,4 +1,4 @@
-package com.dodo.todo.push.service;
+package com.dodo.todo.notification.service;
 
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;

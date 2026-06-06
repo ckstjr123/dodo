@@ -1,6 +1,5 @@
 package com.dodo.todo.member.domain;
 
-import com.dodo.todo.auth.domain.RefreshToken;
 import com.dodo.todo.common.entity.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
