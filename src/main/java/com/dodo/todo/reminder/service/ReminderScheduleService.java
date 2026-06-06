@@ -5,15 +5,15 @@ import com.dodo.todo.reminder.domain.Reminder;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
+import lombok.RequiredArgsConstructor;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.stereotype.Service;
+
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
-import lombok.RequiredArgsConstructor;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -37,7 +37,7 @@ public class ReminderScheduleService {
         }
 
         ScheduledFuture<?> future = taskScheduler.schedule(
-                () -> send(reminder.getId()),
+                () -> remind(reminder.getId()),
                 remindAt.atZone(ZoneId.systemDefault()).toInstant()
         );
         schedules.put(reminder.getId(), future);
@@ -58,11 +58,10 @@ public class ReminderScheduleService {
      * 예약된 Reminder 발송
      * 발송 직전에 Reminder와 Todo 상태를 다시 확인한다.
      */
-    @Transactional(readOnly = true)
-    public void send(Long reminderId) {
+    public void remind(Long reminderId) {
         reminderRepository.findById(reminderId)
                 .filter(this::isSendable)
-                .ifPresent(this::sendPush);
+                .ifPresent(this::send);
     }
 
     private boolean isSendable(Reminder reminder) {
@@ -72,11 +71,11 @@ public class ReminderScheduleService {
                 && !reminder.calculateRemindAt().isAfter(LocalDateTime.now());
     }
 
-    private void sendPush(Reminder reminder) {
+    private void send(Reminder reminder) {
         notificationService.send(
                 reminder.getMember().getFcmToken(),
-                "Todo 알림",
-                reminder.getTodo().getTitle()
+                reminder.getTodo().getTitle(),
+                reminder.getTodo().getMemo()
         );
     }
 }

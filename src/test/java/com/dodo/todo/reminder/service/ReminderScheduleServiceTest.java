@@ -77,9 +77,9 @@ class ReminderScheduleServiceTest {
         reminder.getMember().updateFcmToken("fcm-token");
         when(reminderRepository.findById(reminderId)).thenReturn(Optional.of(reminder));
 
-        reminderScheduleService.send(reminderId);
+        reminderScheduleService.remind(reminderId);
 
-        verify(notificationService).send("fcm-token", "Todo 알림", reminder.getTodo().getTitle());
+        verify(notificationService).send("fcm-token", reminder.getTodo().getTitle(), reminder.getTodo().getMemo());
     }
 
     @Test
@@ -90,7 +90,7 @@ class ReminderScheduleServiceTest {
         reminder.getMember().updateFcmToken("fcm-token");
         when(reminderRepository.findById(reminderId)).thenReturn(Optional.of(reminder));
 
-        reminderScheduleService.send(reminderId);
+        reminderScheduleService.remind(reminderId);
 
         verify(notificationService, never()).send(any(), any(), any());
     }
