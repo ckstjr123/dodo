@@ -318,6 +318,7 @@ class TodoServiceTest {
                 member,
                 "work",
                 "title",
+                TodoStatus.TODO,
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0)
         );
@@ -359,6 +360,7 @@ class TodoServiceTest {
                 member,
                 "work",
                 "title",
+                TodoStatus.TODO,
                 LocalDate.of(2026, 4, 7),
                 LocalTime.of(14, 0)
         );

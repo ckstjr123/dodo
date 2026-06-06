@@ -1,5 +1,6 @@
 package com.dodo.todo.reminder.service;
 
+import com.dodo.todo.common.exception.BusinessException;
 import com.dodo.todo.member.domain.Member;
 import com.dodo.todo.member.service.MemberService;
 import com.dodo.todo.reminder.domain.*;
@@ -7,6 +8,7 @@ import com.dodo.todo.reminder.dto.ReminderCreateRequest;
 import com.dodo.todo.reminder.dto.ReminderUpdateRequest;
 import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
+import com.dodo.todo.todo.domain.TodoStatus;
 import com.dodo.todo.todo.repository.TodoRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -23,6 +25,7 @@ import java.util.Optional;
 
 import static com.dodo.todo.util.TestFixture.*;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.verify;
@@ -53,7 +56,7 @@ class ReminderServiceTest {
         Long todoId = 10L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(todoId, member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(todoId, member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         Reminder reminder = createRelativeReminder(reminderId, todo, member, 10);
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
@@ -73,7 +76,7 @@ class ReminderServiceTest {
         Long todoId = 10L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(todoId, member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(todoId, member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
         Reminder reminder = createAbsoluteReminder(reminderId, todo, member, due);
         when(memberService.findById(memberId)).thenReturn(member);
@@ -95,7 +98,7 @@ class ReminderServiceTest {
         Long memberId = 1L;
         Long todoId = 10L;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(todoId, member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(todoId, member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         when(memberService.findById(memberId)).thenReturn(member);
         when(todoRepository.findByIdAndMemberId(todoId, memberId)).thenReturn(Optional.of(todo));
         when(reminderRepository.countByTodoId(todoId)).thenReturn(5);
@@ -112,7 +115,7 @@ class ReminderServiceTest {
         Long reminderId = 100L;
         int minuteOffset = 30;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
         when(reminderRepository.findByIdAndMemberId(reminderId, memberId))
                 .thenReturn(Optional.of(reminder));
@@ -130,7 +133,7 @@ class ReminderServiceTest {
         Long memberId = 1L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
         LocalDateTime changedDue = LocalDateTime.of(2026, 5, 21, 8, 0);
         AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, due);
@@ -153,7 +156,7 @@ class ReminderServiceTest {
         Long memberId = 1L;
         Long reminderId = 100L;
         Member member = createMember(memberId);
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         Reminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
         when(reminderRepository.findByIdAndMemberId(reminderId, memberId))
                 .thenReturn(Optional.of(reminder));
@@ -170,7 +173,7 @@ class ReminderServiceTest {
         Long todoId = 10L;
         Long reminderId1 = 100L, reminderId2 = 101L;
         Member member = createMember(1L);
-        Todo todo = createScheduledTodo(todoId, member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(todoId, member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         int minuteOffset1 = 10, minuteOffset2 = 30;
         Reminder reminder1 = createRelativeReminder(reminderId1, todo, member, minuteOffset1);
         Reminder reminder2 = createRelativeReminder(reminderId2, todo, member, minuteOffset2);

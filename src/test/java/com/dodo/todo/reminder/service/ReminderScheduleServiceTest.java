@@ -3,7 +3,7 @@ package com.dodo.todo.reminder.service;
 import static com.dodo.todo.util.TestFixture.createAbsoluteReminder;
 import static com.dodo.todo.util.TestFixture.createCategory;
 import static com.dodo.todo.util.TestFixture.createMember;
-import static com.dodo.todo.util.TestFixture.createTodo;
+import static com.dodo.todo.util.TestFixture.createScheduledTodo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
@@ -17,7 +17,9 @@ import com.dodo.todo.reminder.repository.ReminderRepository;
 import com.dodo.todo.todo.domain.Todo;
 import com.dodo.todo.todo.domain.TodoStatus;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 import java.util.concurrent.ScheduledFuture;
 import org.junit.jupiter.api.DisplayName;
@@ -109,7 +111,7 @@ class ReminderScheduleServiceTest {
 
     private Reminder createReminder(Long reminderId, TodoStatus status, LocalDateTime due) {
         Member member = createMember(1L);
-        Todo todo = createTodo(10L, member, createCategory(member, "work"), "todo", status);
+        Todo todo = createScheduledTodo(10L, member, "work", "todo", status, LocalDate.now(), LocalTime.of(12, 0));
         return createAbsoluteReminder(reminderId, todo, member, due);
     }
 }

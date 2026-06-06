@@ -7,6 +7,8 @@ import com.dodo.todo.todo.domain.Todo;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+
+import com.dodo.todo.todo.domain.TodoStatus;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -20,7 +22,7 @@ class ReminderTest {
     @DisplayName("상대 알림은 minuteOffset 설정을 저장한다")
     void createRelativeReminder() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
 
         RelativeReminder reminder = RelativeReminder.create(todo, member, 30);
 
@@ -33,7 +35,7 @@ class ReminderTest {
     @DisplayName("절대 알림은 due 설정을 저장한다")
     void createAbsoluteReminder() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
 
         AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, due);
@@ -47,7 +49,7 @@ class ReminderTest {
     @DisplayName("due 없이 절대 알림을 생성할 수 없다")
     void rejectCreateAbsoluteReminderWithoutDue() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
 
         assertThatThrownBy(() -> AbsoluteReminder.create(todo, member, null))
                 .isInstanceOf(BusinessException.class)
@@ -61,6 +63,7 @@ class ReminderTest {
         Todo todo = Todo.builder()
                 .member(member)
                 .title("title")
+                .status(TodoStatus.TODO)
                 .build();
         LocalDateTime due = LocalDateTime.of(2026, 5, 19, 8, 0);
 
@@ -77,7 +80,7 @@ class ReminderTest {
     @DisplayName("음수 minuteOffset으로 상대 알림을 생성할 수 없다")
     void rejectNegativeMinuteOffset() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
 
         assertThatThrownBy(() -> RelativeReminder.create(todo, member, -1))
                 .isInstanceOf(BusinessException.class)
@@ -88,7 +91,7 @@ class ReminderTest {
     @DisplayName("상대 알림 수정은 타입을 유지하고 minuteOffset만 변경한다")
     void updateRelativeReminder() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         RelativeReminder reminder = RelativeReminder.create(todo, member, 10);
 
         reminder.update(new ReminderUpdateRequest(30, null));
@@ -101,7 +104,7 @@ class ReminderTest {
     @DisplayName("절대 알림 수정은 타입을 유지하고 due만 변경한다")
     void updateAbsoluteReminder() {
         Member member = member();
-        Todo todo = createScheduledTodo(member, "work", "todo", LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
+        Todo todo = createScheduledTodo(member, "work", "todo", TodoStatus.TODO, LocalDate.of(2026, 5, 20), LocalTime.of(9, 0));
         AbsoluteReminder reminder = AbsoluteReminder.create(todo, member, LocalDateTime.of(2026, 5, 19, 8, 0));
         LocalDateTime changedDue = LocalDateTime.of(2026, 5, 21, 8, 0);
 

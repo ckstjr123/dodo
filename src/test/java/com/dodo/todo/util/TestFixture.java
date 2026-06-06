@@ -52,20 +52,22 @@ public final class TestFixture {
             Member member,
             String categoryName,
             String title,
+            TodoStatus status,
             LocalDate scheduledDate,
             LocalTime scheduledTime
     ) {
-        return createScheduledTodo(id, member, createCategory(member, categoryName), title, scheduledDate, scheduledTime);
+        return createScheduledTodo(id, member, createCategory(member, categoryName), title, status, scheduledDate, scheduledTime);
     }
 
     public static Todo createScheduledTodo(
             Member member,
             String categoryName,
             String title,
+            TodoStatus status,
             LocalDate scheduledDate,
             LocalTime scheduledTime
     ) {
-        return createScheduledTodo(null, member, createCategory(member, categoryName), title, scheduledDate, scheduledTime);
+        return createScheduledTodo(null, member, createCategory(member, categoryName), title, status, scheduledDate, scheduledTime);
     }
 
     private static Todo createScheduledTodo(
@@ -73,6 +75,7 @@ public final class TestFixture {
             Member member,
             Category category,
             String title,
+            TodoStatus status,
             LocalDate scheduledDate,
             LocalTime scheduledTime
     ) {
@@ -80,7 +83,7 @@ public final class TestFixture {
                 .member(member)
                 .category(category)
                 .title(title)
-                .status(TodoStatus.TODO)
+                .status(status)
                 .scheduledDate(scheduledDate)
                 .scheduledTime(scheduledTime)
                 .build();
