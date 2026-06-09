@@ -1,40 +1,30 @@
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
+# Root .gitignore
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
+# IDE and Tooling
+.idea/
 .vscode/
+*.swp
+*.swo
+.DS_Store
 
-src/main/resources/application.properties
-src/main/resources/firebase-service-account.json
+# Build artifacts (Root level redundancy)
+build/
+out/
+.gradle/
+
+# Backend (Managed by backend/.gitignore, but kept here for safety)
+backend/build/
+backend/out/
+backend/.gradle/
+backend/bin/
+
+# Frontend (Managed by frontend/.gitignore, but kept here for safety)
+frontend/node_modules/
+frontend/dist/
+frontend/.temp/
+frontend/stats.html
+
+# Environment variables
+.env
+.env.*.local
+*.local

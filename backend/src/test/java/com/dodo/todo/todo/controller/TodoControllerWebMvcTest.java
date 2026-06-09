@@ -75,7 +75,7 @@ class TodoControllerWebMvcTest {
     void createTodoReturnsCreatedResponse() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        TodoRequest request = createTodoRequest(LocalDate.of(2026, 6, 7));
+        TodoRequest request = createTodoRequest(LocalDate.now());
         when(todoService.saveTodo(eq(memberId), any(TodoRequest.class))).thenReturn(todoId);
         authenticate(memberId);
 
@@ -147,7 +147,7 @@ class TodoControllerWebMvcTest {
     void updateTodoReturnsNoContent() throws Exception {
         Long memberId = 5L;
         Long todoId = 7L;
-        TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.of(2026, 6, 7));
+        TodoUpdateRequest request = createTodoUpdateRequest(LocalDate.now());
         doNothing().when(todoService).updateTodo(eq(todoId), eq(memberId), any(TodoUpdateRequest.class));
         authenticate(memberId);
 
@@ -234,7 +234,7 @@ class TodoControllerWebMvcTest {
                 "보고서 작성",
                 "초안부터 작성",
                 1,
-                LocalDateTime.of(2026, 6, 7, 18, 0),
+                LocalDateTime.of(scheduledDate, LocalTime.MAX).plusDays(1),
                 scheduledDate,
                 LocalTime.of(14, 0),
                 createTodoRecurrenceRequest()
@@ -247,7 +247,7 @@ class TodoControllerWebMvcTest {
                 "보고서 작성",
                 "초안부터 작성",
                 1,
-                LocalDateTime.of(2026, 6, 7, 18, 0),
+                LocalDateTime.now().plusDays(1),
                 scheduledDate,
                 LocalTime.of(14, 0),
                 createTodoRecurrenceRequest()

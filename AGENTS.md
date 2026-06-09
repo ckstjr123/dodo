@@ -21,12 +21,13 @@
 - `./gradlew test`
 
 ## Source of Truth
-- Database schema migrations: `src/main/resources/db/migration`
+- Database schema migrations: `backend/src/main/resources/db/migration`
 - Functional specification: `docs/features.md`
 - Deployment: `docs/deployment.md`
 
 ## Architecture
 - The project targets a monolithic architecture.
+- Organized as a monorepo, with the codebase divided into `backend/` and `frontend/` directories.
 - Use package-by-domain structure.
 - Must organize code primarily by domain and let each domain grow around its controller, service, repository, and domain model.
 - Separate persistence interfaces into a dedicated `repository` package instead of placing them under `domain`.
