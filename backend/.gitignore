@@ -1,3 +1,6 @@
+# Firebase
+src/main/resources/firebase-service-account.json
+
 # OS generated files
 .DS_Store
 .DS_Store?
